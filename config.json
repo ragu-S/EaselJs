@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "entry": "./src/index.js",
+    "vendor": "vendor.js",
+    "bundle": "bundle.js",
+    "static": "./static/",
+    "raw": "./raw-assets/",
+    "style": "./src/style/main.scss",
+    "ASSET_PATH": "./assets/",
+    "BASENAME": "/",
+    "JPEG_QUALITY": 80,
+    "templateBlacklist": [],
+    "htpasswd": "/var/www/html",
+    "env": {},
+    "share": {
+      "twitter:image": "assets/images/twitter.png",
+      "facebook:image": "assets/images/facebook.png",
+      "image": "assets/images/facebook.png"
+    }
+  },
+  "development": {
+    "output": "./build/"
+  },
+  "production": {
+    "timestamp": false,
+    "output": "./release/",
+    "minify": true,
+    "removeLogs": true
+  }
+}
