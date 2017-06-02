@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "mobx": "^3.1.11",
     "react": "^15.3.2",
     "react-addons-perf": "^15.3.2",
     "react-async-script": "^0.9.1",
