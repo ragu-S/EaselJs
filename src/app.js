@@ -1,4 +1,4 @@
-const createjs = require('createjs-browserify');
+import * as PIXI from 'pixi.js';
 import AppState from './state/appState';
 import mouseEvents from './user-interaction-handelers/mouseEvents';
 
@@ -10,36 +10,42 @@ class App {
   mouseEventsRegistry = null;
 
   setUpCanvas = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    canvas.id = 'canvas';
+    //Create the renderer
+    let renderer = new PIXI.WebGLRenderer(window.innerWidth, window.innerHeight, {antialias: true, transparent: true, resolution: 1});
 
-    document.body.appendChild(canvas);
+    renderer.autoResize = true;
 
-    this.canvas = canvas;
+    document.body.appendChild(renderer.view);
 
-    this.stage = new createjs.Stage('canvas');
 
-    createjs.Touch.enable(this.stage);
+    this.render = renderer.render.bind(renderer);
+
+    // Create a container object called the `stage`
+    this.stage = new PIXI.Container();
 
     console.log(this.stage);
 
-    this.mouseEventsRegistry = mouseEvents(this.stage, this.state);
+    this.interactionManager = renderer.plugins.interaction;//new PIXI.interaction.InteractionManager(renderer);
+
+    this.renderer = renderer;
+    this.mouseEventsRegistry = mouseEvents(this.stage, this.state, this.interactionManager, renderer);
   }
 
   /* App RAF API */
   setUpRAFLoop = () => {
-    // Update stage will render next frame
-    createjs.Ticker.addEventListener('tick', this.handleTick);
-  }
+    let ticker = new PIXI.ticker.Ticker();
+    ticker.autoStart = false;
 
-  handleTick = () => {
-    if(this.updateCanvas) this.stage.update();
-  }
+    ticker.stop();
 
-  updateDateCanvasOnce = () => {
-    this.stage.update();
+    ticker.add(time => {
+      if(this.updateCanvas) this.render(this.stage);
+    });
+
+    this.ticker = ticker;
+
+    this.ticker.start();
+    // requestAnimationFrame(this.handleTick);
   }
 }
 
