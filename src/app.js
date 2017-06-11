@@ -7,30 +7,42 @@ class App {
   state = state;
   updateCanvas = true;
   stage = null;
+  canvasLayer = null;
   canvas = null;
   userEventsListener = null;
   tools = null;
 
   setUpCanvas = () => {
     //Create the renderer
-    let renderer = new PIXI.WebGLRenderer(window.innerWidth, window.innerHeight, {antialias: true, transparent: true, resolution: 1});
+    let renderer = new PIXI.WebGLRenderer(window.innerWidth * 4, window.innerHeight * 4, {antialias: true, transparent: true, resolution: 1});
 
     renderer.autoResize = true;
 
     document.body.appendChild(renderer.view);
 
-
     this.render = renderer.render.bind(renderer);
+
+    // Will contain all shapes, drawings, etc.
+    this.canvasLayer = new PIXI.Container();
 
     // Create a container object called the `stage`
     this.stage = new PIXI.Container();
+
+    this.stage.addChild(this.canvasLayer);
 
     console.log(this.stage);
 
     this.interactionManager = renderer.plugins.interaction;//new PIXI.interaction.InteractionManager(renderer);
 
     this.renderer = renderer;
-    this.userEventsListener = registerUserEvents(PIXI, this.stage, this.state, this.interactionManager, renderer);
+    this.userEventsListener = registerUserEvents({
+      PIXI,
+      stage: this.stage,
+      canvasLayer: this.canvasLayer,
+      state: this.state,
+      interactionManager: this.interactionManager,
+      renderer
+    });
   }
 
   /* App RAF API */
@@ -47,11 +59,11 @@ class App {
     this.ticker = ticker;
 
     this.ticker.start();
-    // requestAnimationFrame(this.handleTick);
   }
 
   setUpTools = () => {
-    this.tools = initTools(PIXI, this.state, this.stage);
+    console.log('setting up tools');
+    this.tools = initTools({ PIXI, state: this.state, stage: this.stage, canvasLayer: this.canvasLayer });
   }
 }
 

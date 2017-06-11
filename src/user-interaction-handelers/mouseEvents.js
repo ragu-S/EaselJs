@@ -1,7 +1,9 @@
 import * as PIXI from 'pixi.js';
+import { action } from 'mobx';
 
 // Singleton factory
 export default function(stage, state, interactionManager, renderer) {
+  const { mouse } = state;
   const MOUSE_EVENTS = [
     'mouseleave',
     'mouseenter',
@@ -14,6 +16,7 @@ export default function(stage, state, interactionManager, renderer) {
     disabledMouseEvents = [];
 
     constructor(props) {
+      console.log('registering MouseEventRegister');
       stage.interactive = true;
       interactionManager.on('mousedown', this.mouseDown);
       interactionManager.on('mouseup', this.mouseUp);
@@ -30,13 +33,14 @@ export default function(stage, state, interactionManager, renderer) {
       return false;
     }
 
+    @action
     mouseDown = ({data}) => {
       const { x, y } = data.global;
       console.log('mouse Down', data);
-      state.mouseDown = true;
-      state.mouseUp = false;
+      mouse.mouseDown = true;
+      mouse.mouseUp = false;
 
-      const { strokeColor, fillColor, strokeWidth} = state.stroke;
+      const { strokeColor, fillColor, strokeWidth} = mouse.stroke;
       const shape = new Graphics();
 
       shape.lineStyle(strokeWidth, strokeColor, 1);
@@ -50,16 +54,16 @@ export default function(stage, state, interactionManager, renderer) {
       window._shape = shape;
     }
 
+    @action
     mouseUp = (ev) => {
       console.log('mouse Up');
-      state.mouseDown = false;
-      state.mouseUp = true;
+      mouse.mouseDown = false;
+      mouse.mouseUp = true;
       this.shape.cacheAsBitmapboolean = true;
       const { strokeColor, fillColor, strokeWidth} = state.stroke;
       const bounds = this.getPathBounds(this.path, strokeWidth);
       console.log(bounds);
       console.log(this.path);
-
 
       const shape = new Graphics();
       shape.lineStyle(1, 0xFF0000, 1);
@@ -68,11 +72,12 @@ export default function(stage, state, interactionManager, renderer) {
       stage.addChild(shape);
     }
 
+    @action
     mouseMove = ({ data }) => {
-      if(state.mouseDown && !state.mouseUp) {
+      if(mouse.mouseDown && !mouse.mouseUp) {
         const { x, y } = data.global;
         console.log('mouse move');
-        // const { strokeColor, fillColor, strokeWidth} = state.stroke;
+        // const { strokeColor, fillColor, strokeWidth} = mouse.stroke;
         console.log('x:', x, 'y:', y);
         this.path = this.path.concat([x,y]);
         this.shape.drawPolygon(this.path);
@@ -80,6 +85,7 @@ export default function(stage, state, interactionManager, renderer) {
       }
     }
 
+    @action
     getPathBounds(path, strokeWidth = 0) {
       var x1 = path[0];
       var y1 = path[1];
