@@ -21,3 +21,12 @@ export function getPathBounds(path, strokeWidth = 0) {
   // Left, Top, Right, Bottom
   return { x1,y1,x2,y2 }
 }
+
+export function getDistanceBetween(p1, p2, pythogrean = true) {
+  return pythogrean
+    ? Math.sqrt(
+      Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+    )
+    :
+    (p2.x - p1.x) + Math.pow(p2.y - p1.y);
+}

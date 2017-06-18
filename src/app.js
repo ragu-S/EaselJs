@@ -1,4 +1,7 @@
-import * as PIXI from 'pixi.js';
+// import * as PIXI from 'pixi.js';
+
+const createjs = require('createjs-browserify');
+const PIXI = createjs;
 import state from './state/appState';
 import registerUserEvents from './user-interaction-handelers/registerUserEvents';
 import initTools from './tools';
@@ -14,51 +17,60 @@ class App {
 
   setUpCanvas = () => {
     //Create the renderer
-    let renderer = new PIXI.WebGLRenderer(window.innerWidth * 4, window.innerHeight * 4, {antialias: true, transparent: true, resolution: 1});
+    // let renderer = new PIXI.WebGLRenderer(window.innerWidth * 4, window.innerHeight * 4, {antialias: true, transparent: true, resolution: 1});
 
-    renderer.autoResize = true;
+    // renderer.autoResize = true;
 
-    document.body.appendChild(renderer.view);
+    // document.body.appendChild(renderer.view);
 
-    this.render = renderer.render.bind(renderer);
+    // this.render = renderer.render.bind(renderer);
+    const canvas = document.createElement('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.id = 'canvas';
+
+    document.body.appendChild(canvas);
 
     // Will contain all shapes, drawings, etc.
     this.canvasLayer = new PIXI.Container();
 
     // Create a container object called the `stage`
-    this.stage = new PIXI.Container();
+    // this.stage = new PIXI.Container();
 
+
+    this.stage = new PIXI.Stage('canvas');
     this.stage.addChild(this.canvasLayer);
+    PIXI.Touch.enable(this.stage);
 
     console.log(this.stage);
 
-    this.interactionManager = renderer.plugins.interaction;//new PIXI.interaction.InteractionManager(renderer);
+    // this.interactionManager = renderer.plugins.interaction;//new PIXI.interaction.InteractionManager(renderer);
 
-    this.renderer = renderer;
+    // this.renderer = renderer;
     this.userEventsListener = registerUserEvents({
       PIXI,
       stage: this.stage,
       canvasLayer: this.canvasLayer,
       state: this.state,
-      interactionManager: this.interactionManager,
-      renderer
+      // interactionManager: this.interactionManager,
+      // renderer
     });
   }
 
   /* App RAF API */
   setUpRAFLoop = () => {
-    let ticker = new PIXI.ticker.Ticker();
-    ticker.autoStart = false;
+    requestAnimationFrame(this.loop);
+  }
 
-    ticker.stop();
+  loop = () => {
+    // if(this.updateCanvas) this.render(this.stage);
+    if(this.updateCanvas) this.stage.update();
+    requestAnimationFrame(this.loop);
+  }
 
-    ticker.add(time => {
-      if(this.updateCanvas) this.render(this.stage);
-    });
-
-    this.ticker = ticker;
-
-    this.ticker.start();
+  loopOnce = () => {
+    if(this.updateCanvas) this.stage.update();
+    // if(this.updateCanvas) this.render(this.stage);
   }
 
   setUpTools = () => {

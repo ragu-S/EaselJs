@@ -1,8 +1,11 @@
 import App from './app';
-import * as PIXI from 'pixi.js';
+const createjs = require('createjs-browserify');
 
 window.addEventListener('load', () => {
+  require('./util/stats')();
+
   console.log('load detected');
+
   const { setUpCanvas, setUpRAFLoop, setUpTools, renderer } = App;
 
   setUpCanvas();
@@ -12,6 +15,6 @@ window.addEventListener('load', () => {
   setUpTools();
   // var shape = new createjs.Shape();
   // shape.graphics.beginFill('red').drawRect(0, 0, 120, 120);
-  // App.stage.addChild(shape);
+  // App.canvasLayer.addChild(shape);
   // updateDateCanvasOnce();
 });

@@ -1,5 +1,6 @@
 'use strict';
 import { action, autorun } from 'mobx';
+import { getDistanceBetween } from '../util/geometry-utils';
 
 // Singleton factory
 export default function(app) {
@@ -13,16 +14,16 @@ export default function(app) {
   ];
 
   const { Graphics } = PIXI;
-  const { mouse } = state;
+  const { pointerState, touchState } = state;
   class UserEventListeners {
     disabledMouseEvents = [];
     path = [];
     constructor(props) {
-      stage.interactive = true;
-      window.addEventListener('touchstart', this.multiTouch);
-      interactionManager.on('touchstart', this.onPointerDown);
-      interactionManager.on('touchend', this.onPointerUp);
-      interactionManager.on('touchmove', this.onPointerMove, {capture: true, passive: true});
+      // canvasLayer.interactive = true;
+      // window.addEventListener('touchstart', this.multiTouch);
+      stage.addEventListener('stagemousedown', this.onPointerDown);
+      stage.addEventListener('stagemouseup', this.onPointerUp);
+      stage.addEventListener('stagemousemove', this.onPointerMove);
     }
 
     disableEvent = (eventName) => {
@@ -37,63 +38,93 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
-      const {data} = ev;
-      const { x, y } = data.global;
-      console.log(ev);
-      if(mouse.pointerDown === true && mouse.pointerUp === false) {
-        // console.log('multi touch');
-        // mouse.touches.push({
-        //   x: x,
-        //   y: y
-        // })
+      const { stageX, stageY, nativeEvent } = ev;
 
-        // console.log(mouse.touches);
+      console.log(ev);
+      // if(pointerState.pointerDown === true && pointerState.pointerUp === false) {
+      if(nativeEvent.touches && nativeEvent.touches.length > 1) {
+        // console.log('multi touch');
+        // if(ev.touches.length > 1) {
+          touchState.touches.replace(
+            [...nativeEvent.touches].map(touch => {
+              return {
+                x: touch.clientX,
+                y: touch.clientY
+              }
+            })
+          )
+        // }
+        // console.log(touchState.touches);
       }
       else {
-        mouse.pointerDown = true;
-        mouse.pointerUp = false;
-        mouse.x = x;
-        mouse.y = y;
+        pointerState.pointerDown = true;
+        pointerState.pointerUp = false;
+        const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
+        pointerState.x = x;
+        pointerState.y = y;
       }
     }
 
     @action
     onPointerUp = (ev) => {
-      mouse.pointerDown = false;
-      mouse.pointerUp = true;
-      if(mouse.touches.length !== 0) {
+      pointerState.pointerDown = false;
+      pointerState.pointerUp = true;
+      if(touchState.touches.length > 1) {
         console.log('pointer Up, clearing touchlist');
-        mouse.touches.pop();
+        touchState.touches.pop();
       }
-      // mouse.touches.remove(mouse.touches[0]);
-      //mouse.touches.remove(getClosestPoint(ev.data.global, mouse.touches), 1);
+      // touchState.touches.remove(touchState.touches[0]);
+      //touchState.touches.remove(getClosestPoint(ev.data.global, touchState.touches), 1);
     }
 
     @action
     onPointerMove = (ev) => {
-      if(ev.data.targetTouches && ev.data.targetTouches.length !== 0) {
-        console.log('touches', ev.data.targetTouches);
-      }
-      if(mouse.pointerDown && !mouse.pointerUp) {
-        const { x, y } = ev.data.global;
-        mouse.x = x;
-        mouse.y = y;
+      // console.log(ev);
+      if(pointerState.pointerDown && !pointerState.pointerUp) {
+        const { stageX, stageY, nativeEvent } = ev;
+        if(nativeEvent.touches && nativeEvent.touches.length === 2) {
+          // console.log('touches', ev.nativeEvent.touches);
+
+          const distance = getDistanceBetween({
+            x: nativeEvent.touches[0].clientX,
+            y: nativeEvent.touches[0].clientY
+          }, {
+            x: nativeEvent.touches[1].clientX,
+            y: nativeEvent.touches[1].clientY
+          })
+
+          if(Math.abs(touchState.zoomTouchDistance - distance) > 20) {
+            console.log('zoom distance', touchState.zoomTouchDistance);
+            touchState.zoomTouchDistance = distance;
+          }
+          // touchState.touches.replace(
+          //   [...nativeEvent.touches].map(touch => {
+          //     return {
+          //       x: touch.clientX,
+          //       y: touch.clientY
+          //     }
+          //   })
+          // )
+        }
+        const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
+        pointerState.x = x;
+        pointerState.y = y;
       }
     }
 
     @action
     multiTouch = (ev) => {
       console.log(ev);
-      if(ev.touches.length > 1) {
-        mouse.touches.replace(
-          [...ev.touches].map(touch => {
-            return {
-              x: touch.clientX,
-              y: touch.clientY
-            }
-          })
-        )
-      }
+      // if(ev.touches.length > 1) {
+      //   touchState.touches.replace(
+      //     [...ev.touches].map(touch => {
+      //       return {
+      //         x: touch.clientX,
+      //         y: touch.clientY
+      //       }
+      //     })
+      //   )
+      // }
     }
   }
 

@@ -7,6 +7,13 @@ var configs = require('../config.json');
 var config = merge.recursive(configs.defaults, configs[type]);
 var path = require('path');
 
+const { _ } = argv;
+
+if(_.includes('test')) {
+  config.entry = path.join('src', 'tests');
+}
+
+
 config.stylesheet = path.parse(config.style).name + '.css';
 
 if (type==='production' && config.timestamp) {
@@ -18,7 +25,7 @@ if (type==='production' && config.timestamp) {
 
     config.bundle = path.parse(config.bundle).name.split(delimiter)[0] + stamp + '.js';
     if (config.vendor) config.vendor = path.parse(config.vendor).name.split(delimiter)[0] + stamp + '.js';
-    
+
     var parsed = path.parse(config.ASSET_PATH);
     config.ASSET_PATH = path.join(parsed.dir, parsed.base+stamp)+'/';
   }
