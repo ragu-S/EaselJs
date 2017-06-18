@@ -30,3 +30,23 @@ export function getDistanceBetween(p1, p2, pythogrean = true) {
     :
     (p2.x - p1.x) + Math.pow(p2.y - p1.y);
 }
+
+// Default container is stage
+const defaultContainer = { x: 0, y: 0, width: innerWidth, height: innerHeight };
+export function centerCoords(child, container = defaultContainer) {
+  // inner.x,
+  // inner.y,
+  // inner.width,
+  // inner.height
+  // child = child.width < container.width
+  return {
+    x: Math.floor((container.width - inner.width) / 2),
+    y: Math.floor((container.height - inner.height) / 2)
+  }
+}
+
+// ignore border
+// border = [0,0,0,0] top, left, right, bottom
+export function ignoreBorderContainer(shape, border) {
+  // shape.x - ,
+}
