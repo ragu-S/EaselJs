@@ -1,29 +1,29 @@
 // import app from '../app';
-import {reaction, autorun, action} from 'mobx'
-import { getPathBounds } from '../util/geometry-utils';
+import {when, reaction, autorun, action} from 'mobx'
+import { getPathBounds, centerCoords } from '../util/geometry-utils';
 import throttle from 'lodash.throttle';
-
+import debounce from 'lodash.debounce';
 
 export default function(app) {
-  const { PIXI, state, stage, canvasLayer } = app;
-  const { Graphics, Shape } = PIXI;
-  const { appState, pointerState, drawToolState, touchState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
+  const { CREATEJS, state, stage, canvasLayer, userEventsListeners } = app;
+  const { Graphics, Shape, Tween } = CREATEJS;
+  const { appState, pointerState, drawToolState, quickToolState, touchState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
   const MIN_ZOOM = 0.5;
   const MAX_ZOOM = 10;
   const ZOOM_INCREMENT = 0.1;
 
-  let MAX_PAN_X = window.innerWidth * 1.5;
-  let MAX_PAN_Y = window.innerHeight * 1.5;
-  const boundaryShape = new Shape();
-  boundaryShape.graphics
-    .setStrokeStyle(2)
-    .beginStroke('#00ff00')
-    .drawRect(0,0)
-    .endStroke();
+  /* DEBUG */
+  // const boundaryShape = new Shape();
 
-  stage.addChild(
-    boundaryShape
-  );
+  // boundaryShape.graphics
+  //   .setStrokeStyle(2)
+  //   .beginStroke('#00ff00')
+  //   .drawRect(0,0)
+  //   .endStroke();
+
+  // stage.addChild(
+  //   boundaryShape
+  // );
 
   // Draw Tool, gets instantiated when user clicks
   class DrawTool {
@@ -36,6 +36,7 @@ export default function(app) {
     topMostBox = null;
     bottomMostBox = null;
     boundary = new Shape();
+    cachedShape = null;
     /*
      boundingBoxes
      leftMostBox
@@ -49,9 +50,11 @@ export default function(app) {
       this.drawSession = [];
 
       this.shape = new Shape();
+      this.cachedShape = new Shape();
 
       canvasLayer.addChild(
-        this.shape
+        this.shape,
+        this.cachedShape
       );
 
       canvasLayer.addChild(this.boundary);
@@ -65,15 +68,27 @@ export default function(app) {
             'strokeWidth', drawToolState.strokeWidth
           )
 
+          const { strokeColor, fillColor, strokeWidth } = drawToolState;
+          this.fillColor = fillColor;
+          this.strokeWidth = strokeWidth;
+          this.strokeColor = strokeColor;
+
           // const {x,y,x2,y2} = this.getBounds();
 
           // this.shape.cache(x,y,x2,y2);
-          this.shape = new Shape();
-
-          canvasLayer.addChild(
-            this.shape
-          )
         }
+      })
+
+      reaction(() => {
+        // return [
+        //   ,
+        //   appState.displayLayerBounds
+        // ]
+        return appState.zoomIndex;
+      }, () => {
+        console.log('updating cache');
+        const { x, y, width, height } = appState.displayLayerBounds;
+        this.cachedShape.cache(x,y,width,height,appState.zoomIndex);
       })
 
       window._drawTool = this;
@@ -115,8 +130,11 @@ export default function(app) {
       const { strokeColor, fillColor, strokeWidth } = drawToolState;
       this.drawSession.push([x,y]);
 
+      this.fillColor = fillColor;
       this.strokeWidth = strokeWidth;
       this.strokeColor = strokeColor;
+
+      if(this.cacheResult) clearTimeout(this.cacheResult);
     }
 
     onDrawMove = () => {
@@ -133,15 +151,14 @@ export default function(app) {
       this.draw();
     }
 
-
+    @action
     onDrawStop = () => {
       this.drawStarted = false;
       window.PATH = this.path;
 
       /* Shows bounding box for text paths */
-      const { strokeColor, fillColor, strokeWidth} = drawToolState;
       const lastDrawSession = this.drawSession[this.drawSession.length - 1];
-      const bounds = getPathBounds(lastDrawSession, strokeWidth);
+      const bounds = getPathBounds(lastDrawSession, this.strokeWidth);
 
       if(this.previousBounds !== null) {
         if(this.x1 > bounds.x1) this.x1 = bounds.x1;
@@ -186,13 +203,16 @@ export default function(app) {
         )
         .endStroke()
 
+      if(this.cacheResult) clearTimeout(this.cacheResult);
+      // if(this.drawSession.length < 4) return;
+
+      this.cacheResult = setTimeout(this.updateCache, 1500);
       // const shape = new Shape();
       // shape.graphics
       //   .setStrokeStyle(1)
       //   .beginStroke('#FF0000')
       //   .drawRect(bounds.x1, bounds.y1, bounds.x2 - bounds.x1, bounds.y2 - bounds.y1)
       //   .endStroke()
-
       // canvasLayer.addChild(shape);
     }
 
@@ -210,10 +230,28 @@ export default function(app) {
       })
     }
 
-    // @action
-    // setStore = (keyValuePairs = []) => {
-    //   keyValuePairs.forEach(([key, value]) => appState[key] = value)
-    // }
+    updateCache = () => {
+      console.log('setting new cache!');
+      const { x, y, width, height } = appState.displayLayerBounds;
+
+      const updates = new Graphics()
+        .setStrokeStyle(this.strokeWidth)
+        .beginStroke(this.strokeColor)
+      // updates.graphics.instructions.concat(this.shape.graphics.instructions);
+
+      // const instructions = this.shape.graphics.instructions;
+      // const iLength = this.shape.graphics.instructions.length - 2;
+      // const cachedGraphics = this.cachedShape.graphics;
+      this.cachedShape.graphics.instructions.slice(0,-2)
+      .concat(this.shape.graphics.instructions.slice(1,-2))
+      .forEach(i => updates.append(i));
+
+      this.cachedShape.set({graphics: updates})
+
+      this.cachedShape.cache(x,y,width,height,appState.zoomIndex);
+      this.shape.graphics.clear();
+      this.drawSession = [];
+    }
   }
 
   class PanTool {
@@ -224,6 +262,7 @@ export default function(app) {
     prevZoomDistance = 0;
     constructor() {
       window._PAN = this;
+      // this.updateAppStoreZoomIndex = debounce(action(this.updateAppStoreZoomIndex.bind(this)), 150);
       /* User interactions:
       1) panning, two fingers used
 
@@ -231,6 +270,7 @@ export default function(app) {
       */
       this.panDisposer = autorun(() => {
         if(touchState.touches.length > 1 && pointerState.pointerDown == true) {
+          console.log('panning');
           let returnEarly = false;
           let MAX_PAN_X = window.innerWidth * 1.5 * this.zoomScale;
           let MAX_PAN_Y = window.innerHeight * 1.5 * this.zoomScale;
@@ -300,10 +340,8 @@ export default function(app) {
         else if(this.zoomScale < MIN_ZOOM) this.zoomScale = MIN_ZOOM;
         else {
           canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
-          // canvasLayer.scaleX = this.zoomScale;
-          // canvasLayer.scaleY = this.zoomScale;
+          this.updateAppStoreZoomIndex();
         }
-
         // const point = canvasLayer.localToGlobal(pointerState.x, pointerState.y);
         // const secondTouch = touchState.touches[1];
         // const point2 = canvasLayer.localToGlobal(secondTouch.x, secondTouch.y);
@@ -319,10 +357,10 @@ export default function(app) {
       })
     }
 
-    zoomHander = throttle(() => {
-      // canvasLayer.x = (canvasLayer.x * this.zoomScale - canvasLayer.x) * this.zoomScale;
-      // canvasLayer.y = (canvasLayer.y * this.zoomScale - canvasLayer.y) * this.zoomScale;
-    }, 50);
+    updateAppStoreZoomIndex = debounce(action(() => {
+      console.log('setting zoom index');
+      appState.zoomIndex = this.zoomScale;
+    }), 150)
 
     centerCanvas = () => {
 
@@ -336,15 +374,58 @@ export default function(app) {
     constructor() {
       window.QUICKTOOL = this;
 
+      this.shape = new Shape();
+      this.graphics = this.shape.graphics;
+      this.radius = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.4);
 
+      stage.addChild(this.shape);
+
+      this.listen = autorun(() => {
+        // Check if any canvas objects are below click event
+        // This will allow tool to customize itself to w/e object is beneath it
+
+        if(quickToolState.showTool === true) this.showQuickTool()
+        else this.hideQuickTool()
+      })
+
+      userEventsListeners.on('onefingerclick', (ev) => {
+        quickToolState.showTool = !quickToolState.showTool;
+      })
     }
 
     showQuickTool = () => {
+      this.graphics
+          .setStrokeStyle()
+          .beginStroke('#000000')
+          .drawCircle(0,0, this.radius)
+          .endStroke()
 
+      const {x,y} = centerCoords({x:0,y:0,radius:this.radius});
+      const updated = stage.globalToLocal(x,y);
+      this.shape.x = updated.x;
+      this.shape.y = updated.y;
+      this.shape.scaleX = this.shape.scaleY = 0;
+
+      Tween.get(this.shape)
+       .to({ scaleX: 1, scaleY: 1, override: true, useTicks: true }, 500);
+
+      // const boundaryShape = new Shape();
+
+      // boundaryShape.graphics
+      //   .setStrokeStyle(2)
+      //   .beginStroke('#00ff00')
+      //   .drawRect(0,0)
+      //   .endStroke();
+
+      // stage.addChild(
+      //   boundaryShape
+      // );
     }
 
     hideQuickTool = () => {
-
+      Tween.get(this.shape)
+      .to({ scaleX: 0, scaleY: 0, override: true, useTicks: true }, 500)
+      .call(() => this.graphics.clear())
     }
 
   }

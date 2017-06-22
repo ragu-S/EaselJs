@@ -58,14 +58,13 @@ class DrawTool {
   @observable strokeColor = '#0000ff';
   @observable fillColor = '#ff00FF';
   @observable strokeWidth = 1;
+  @observable cachedScale = 1;
 
-  @computed get style() {
-    return [
-      this.strokeColor,
-      this.fillColor,
-      this.strokeWidth
-    ]
-  }
+}
+
+class QuickTool {
+  @observable showTool = false;
+  @observable selectedTool = TOOLS.PAN;
 }
 
 class CanvasObjects {
@@ -84,6 +83,7 @@ const drawToolState = new DrawTool();
 const pointerState = new PixiPointerState();
 const touchState = new TouchState();
 const canvasObjects = new CanvasObjects();
+const quickToolState = new QuickTool();
 
 const state = {
   appState,
@@ -91,6 +91,7 @@ const state = {
   pointerState,
   touchState,
   canvasObjects,
+  quickToolState,
   TOOLS,
   POINTER_TYPE
 };

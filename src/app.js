@@ -1,7 +1,6 @@
-// import * as PIXI from 'pixi.js';
+// import * as CREATEJS from 'CREATEJS.js';
 
-const createjs = require('createjs-browserify');
-const PIXI = createjs;
+const CREATEJS = require('createjs-browserify');
 import state from './state/appState';
 import registerUserEvents from './user-interaction-handelers/registerUserEvents';
 import initTools from './tools';
@@ -12,12 +11,12 @@ class App {
   stage = null;
   canvasLayer = null;
   canvas = null;
-  userEventsListener = null;
+  userEventsListeners = null;
   tools = null;
 
   setUpCanvas = () => {
     //Create the renderer
-    // let renderer = new PIXI.WebGLRenderer(window.innerWidth * 4, window.innerHeight * 4, {antialias: true, transparent: true, resolution: 1});
+    // let renderer = new CREATEJS.WebGLRenderer(window.innerWidth * 4, window.innerHeight * 4, {antialias: true, transparent: true, resolution: 1});
 
     // renderer.autoResize = true;
 
@@ -27,28 +26,33 @@ class App {
     const canvas = document.createElement('canvas');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    canvas.style.position = 'absolute';
+    canvas.style.top = 0;
+    canvas.style.left = 0;
+    canvas.style.right = 0;
+    canvas.style.bottom = 0;
     canvas.id = 'canvas';
-
+    this.canvas = canvas;
     document.body.appendChild(canvas);
 
     // Will contain all shapes, drawings, etc.
-    this.canvasLayer = new PIXI.Container();
+    this.canvasLayer = new CREATEJS.Container();
 
     // Create a container object called the `stage`
-    // this.stage = new PIXI.Container();
+    // this.stage = new CREATEJS.Container();
 
 
-    this.stage = new PIXI.Stage('canvas');
+    this.stage = new CREATEJS.Stage('canvas');
     this.stage.addChild(this.canvasLayer);
-    PIXI.Touch.enable(this.stage);
+    CREATEJS.Touch.enable(this.stage);
 
     console.log(this.stage);
-
-    // this.interactionManager = renderer.plugins.interaction;//new PIXI.interaction.InteractionManager(renderer);
+    window._CREATEJS = CREATEJS;
+    // this.interactionManager = renderer.plugins.interaction;//new CREATEJS.interaction.InteractionManager(renderer);
 
     // this.renderer = renderer;
-    this.userEventsListener = registerUserEvents({
-      PIXI,
+    this.userEventsListeners = registerUserEvents({
+      CREATEJS,
       stage: this.stage,
       canvasLayer: this.canvasLayer,
       state: this.state,
@@ -75,7 +79,7 @@ class App {
 
   setUpTools = () => {
     console.log('setting up tools');
-    this.tools = initTools({ PIXI, state: this.state, stage: this.stage, canvasLayer: this.canvasLayer });
+    this.tools = initTools({ CREATEJS, userEventsListeners: this.userEventsListeners, state: this.state, stage: this.stage, canvasLayer: this.canvasLayer });
   }
 }
 

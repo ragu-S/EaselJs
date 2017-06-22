@@ -1,4 +1,4 @@
-import * as PIXI from 'pixi.js';
+import * as CREATEJS from 'CREATEJS.js';
 import { action } from 'mobx';
 
 // Singleton factory
@@ -10,7 +10,7 @@ export default function(stage, state, interactionManager, renderer) {
     'mousemove'
   ];
 
-  const { Graphics } = PIXI;
+  const { Graphics } = CREATEJS;
 
   class MouseEventRegister {
     disabledMouseEvents = [];

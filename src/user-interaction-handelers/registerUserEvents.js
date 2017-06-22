@@ -4,7 +4,7 @@ import { getDistanceBetween } from '../util/geometry-utils';
 
 // Singleton factory
 export default function(app) {
-  const {PIXI, stage, canvasLayer, state, interactionManager, renderer} = app;
+  const {CREATEJS, stage, canvasLayer, state, interactionManager, renderer} = app;
   const MOUSE_EVENTS = [
     'pointerleave',
     'pointerenter',
@@ -13,11 +13,12 @@ export default function(app) {
     'pointerup'
   ];
 
-  const { Graphics } = PIXI;
+  const { Graphics, EventDispatcher, Event } = CREATEJS;
   const { pointerState, touchState, POINTER_TYPE: { POINTER, FINGER } } = state;
   class UserEventListeners {
     disabledMouseEvents = [];
     path = [];
+    oneFingerDown = false;
     constructor(props) {
       stage.addEventListener('stagemousedown', this.onPointerDown);
       stage.addEventListener('stagemouseup', this.onPointerUp);
@@ -39,16 +40,7 @@ export default function(app) {
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
-        let touchType = POINTER;
-
-        if((touches[0].radiusX <= 0.2 || touches[0].radiusY <= 0.2) && pointerState !== POINTER) {
-          touchType = POINTER;
-          console.log('pointer input device')
-        }
-        else {
-          touchType = FINGER;
-          console.log('finger touch!');
-        }
+        let touchType = (touches[0].radiusX <= 0.2 || touches[0].radiusY <= 0.2) ? POINTER : FINGER;
 
         if(touches.length > 1) {
           touchState.touches.replace(
@@ -69,6 +61,10 @@ export default function(app) {
           })
         }
         else {
+          if(touchType === FINGER) {
+            console.log('finger touch!');
+            this.oneFingerDown = true;
+          }
           pointerState.pointerDown = true;
           pointerState.pointerUp = false;
           const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
@@ -83,16 +79,37 @@ export default function(app) {
       }
     }
 
+
+    onOneFingerTouch = (ev) => {
+      const { stageX, stageY, nativeEvent } = ev;
+    }
+
     @action
     onPointerUp = (ev) => {
-      pointerState.pointerDown = false;
-      pointerState.pointerUp = true;
-      if(touchState.touches.length > 1) {
-        console.log('pointer Up, clearing touchlist');
-        touchState.touches.clear();
-        touchState.touchDownDistance = 0;
-        touchState.zoomTouchDistance = 0;
+      const { nativeEvent } = ev;
+      if(nativeEvent.touches !== undefined) {
+        pointerState.pointerDown = false;
+        pointerState.pointerUp = true;
+
+        if(touchState.touches.length > 1) {
+          console.log('pointer Up, clearing touchlist');
+          touchState.touches.clear();
+          touchState.touchDownDistance = 0;
+          touchState.zoomTouchDistance = 0;
+        }
+        else if(this.oneFingerDown === true) {
+          console.log('finger touch up, CLICK!', ev);
+          this.oneFingerClick = true;
+          const clickEvent = new Event('onefingerclick');
+          clickEvent.nativeEvent = ev;
+          clickEvent.stageX = ev.stageX;
+          clickEvent.stageY = ev.stageY;
+
+          this.dispatchEvent(clickEvent);
+        }
       }
+
+      this.oneFingerDown = false;
     }
 
     @action
@@ -107,17 +124,19 @@ export default function(app) {
           x: nativeEvent.touches[1].clientX,
           y: nativeEvent.touches[1].clientY
         })
-
+        // let distanceBetween =  getDistanceBetween(
+        //   , {
+        //   x: nativeEvent.touches[1].clientX,
+        //   y: nativeEvent.touches[1].clientY
+        // });
+        console.log('settings pan values', distance);
         if(Math.abs(distance - touchState.touchDownDistance) > 40) {
           touchState.zoomTouchDistance = distance;
         }
         else if(
-          getDistanceBetween(
-            touchState.touches[0], {
-            x: nativeEvent.touches[0].clientX,
-            y: nativeEvent.touches[0].clientY
-          }) >= 5
+        distance <= 90
         ) {
+
           const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
           pointerState.x = x;
           pointerState.y = y;
@@ -131,6 +150,8 @@ export default function(app) {
       // }
     }
   }
+
+  EventDispatcher.initialize(UserEventListeners.prototype);
 
   return new UserEventListeners();
 }
