@@ -8,10 +8,15 @@ export default function(app) {
   const { CREATEJS, state, stage, canvasLayer, userEventsListeners } = app;
   const { Graphics, Shape, Tween } = CREATEJS;
   const { appState, pointerState, drawToolState, quickToolState, touchState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
-  const MIN_ZOOM = 0.5;
+  const MIN_ZOOM = 0.3;
   const MAX_ZOOM = 10;
   const ZOOM_INCREMENT = 0.1;
-
+  const DEBUG_TOOL_MARGIN = {
+    left: 5,
+    top: 5,
+    bottom: 5,
+    right: 10
+  };
   /* DEBUG */
   // const boundaryShape = new Shape();
 
@@ -24,6 +29,27 @@ export default function(app) {
   // stage.addChild(
   //   boundaryShape
   // );
+  let all_debug_tools = [];
+  function alignDebugToolObjects() {
+    let curYLine = 0;
+    all_debug_tools.forEach(t => {
+      const { width, height } = t.getBounds();
+      t.x = window.innerWidth - (width + DEBUG_TOOL_MARGIN.right);
+      t.y = curYLine + parseInt(t.font) + (DEBUG_TOOL_MARGIN.top);
+      curYLine = (height + DEBUG_TOOL_MARGIN.top);
+    })
+  }
+
+  const displayObjectText = new CREATEJS.Text("displayObjectText", "12px Arial", "#ff7700");
+  const panZoomText = new CREATEJS.Text("panZoomText", "12px Arial", "#ff0592");
+  displayObjectText.textBaseline = "alphabetic";
+  panZoomText.textBaseline = "alphabetic";
+
+  stage.addChild(displayObjectText, panZoomText);
+
+  all_debug_tools = all_debug_tools.concat(displayObjectText, panZoomText)
+
+  alignDebugToolObjects(all_debug_tools);
 
   // Draw Tool, gets instantiated when user clicks
   class DrawTool {
@@ -51,6 +77,8 @@ export default function(app) {
 
       this.shape = new Shape();
       this.cachedShape = new Shape();
+      canvasLayer.x = 0;
+      canvasLayer.y = 0;
 
       canvasLayer.addChild(
         this.shape,
@@ -58,6 +86,9 @@ export default function(app) {
       );
 
       canvasLayer.addChild(this.boundary);
+
+      // DEBUG
+      // show debug values
 
       // Listen to style changes
       autorun(() => {
@@ -118,7 +149,6 @@ export default function(app) {
             this.onDrawStop();
           }
         }
-
         this.previousTouchType = pointerState.touchType;
       })
     }
@@ -203,6 +233,16 @@ export default function(app) {
         )
         .endStroke()
 
+      displayObjectText.text =
+        `DisplayLayerBounds: {
+          x:${appState.displayLayerBounds.x.toFixed(2)},
+          y:${appState.displayLayerBounds.y.toFixed(2)},
+          width:${appState.displayLayerBounds.width.toFixed(2)},
+          height:${appState.displayLayerBounds.height.toFixed(2)}
+        }`;
+
+      alignDebugToolObjects(all_debug_tools);
+
       if(this.cacheResult) clearTimeout(this.cacheResult);
       // if(this.drawSession.length < 4) return;
 
@@ -237,11 +277,7 @@ export default function(app) {
       const updates = new Graphics()
         .setStrokeStyle(this.strokeWidth)
         .beginStroke(this.strokeColor)
-      // updates.graphics.instructions.concat(this.shape.graphics.instructions);
 
-      // const instructions = this.shape.graphics.instructions;
-      // const iLength = this.shape.graphics.instructions.length - 2;
-      // const cachedGraphics = this.cachedShape.graphics;
       this.cachedShape.graphics.instructions.slice(0,-2)
       .concat(this.shape.graphics.instructions.slice(1,-2))
       .forEach(i => updates.append(i));
@@ -262,6 +298,7 @@ export default function(app) {
     prevZoomDistance = 0;
     constructor() {
       window._PAN = this;
+      this.initialized = false;
       // this.updateAppStoreZoomIndex = debounce(action(this.updateAppStoreZoomIndex.bind(this)), 150);
       /* User interactions:
       1) panning, two fingers used
@@ -269,19 +306,16 @@ export default function(app) {
       2) zooming is two fingers spread
       */
       this.panDisposer = autorun(() => {
-        if(touchState.touches.length > 1 && pointerState.pointerDown == true) {
+        console.log('pointerState.touchType', pointerState.touchType);
+        console.log('pointerState', pointerState.x, 'touches length', touchState.touches.length);
+        if(touchState.touches.length === 1 && pointerState.touchType === FINGER && pointerState.pointerMove === true) {
           console.log('panning');
           let returnEarly = false;
           let MAX_PAN_X = window.innerWidth * 1.5 * this.zoomScale;
           let MAX_PAN_Y = window.innerHeight * 1.5 * this.zoomScale;
           const bounds = appState.displayLayerBounds;
 
-          const point = canvasLayer.localToGlobal(pointerState.x, pointerState.y);
-          const secondTouch = touchState.touches[1];
-          const point2 = canvasLayer.localToGlobal(secondTouch.x, secondTouch.y);
-
-          const x = (point.x + point2.x) / 2;
-          const y = (point.y + point2.y) / 2;
+          const { x, y } = canvasLayer.localToGlobal(pointerState.x, pointerState.y);
 
           let xPos = 0;
           let yPos = 0;
@@ -305,23 +339,31 @@ export default function(app) {
             yPos = Math.abs(y - this.originalY);
           }
 
-          if(bounds !== null) {
-            MAX_PAN_X = (Math.max(window.innerWidth, bounds.width));
-            MAX_PAN_Y = (Math.max(window.innerHeight, bounds.height));
-          }
+          // if(bounds !== null) {
+          //   MAX_PAN_X = (Math.max(window.innerWidth, bounds.width));
+          //   MAX_PAN_Y = (Math.max(window.innerHeight, bounds.height));
+          // }
 
-          if((Math.abs(canvasLayer.x + xPos)) > MAX_PAN_X * this.zoomScale) {
-            xPos = 0;
-          }
-          if((Math.abs(canvasLayer.y + yPos)) > MAX_PAN_Y * this.zoomScale) {
-            yPos = 0;
-          }
+          // if((Math.abs(canvasLayer.x + xPos)) > MAX_PAN_X * this.zoomScale) {
+          //   xPos = 0;
+          // }
+          // if((Math.abs(canvasLayer.y + yPos)) > MAX_PAN_Y * this.zoomScale) {
+          //   yPos = 0;
+          // }
 
           this.originalX = x;
           this.originalY = y;
 
           canvasLayer.x += xPos;
           canvasLayer.y += yPos;
+
+          panZoomText.text = `Pan Zoom Text: {
+            x: ${canvasLayer.x.toFixed(2)},
+            y: ${canvasLayer.y.toFixed(2)},
+            zoom: ${this.zoomScale.toFixed(2)}
+          }`
+
+          alignDebugToolObjects();
         }
         else {
           this.originalX = -1;
@@ -329,12 +371,20 @@ export default function(app) {
         }
       })
 
-      this.zoomDisposer = autorun(() => {
-        // console.log('zoom autorun');
+      this.zoomDisposer = reaction(() => touchState.zoomTouchDistance, () => {
+        if(touchState.touches.length <= 1) return;
         if(touchState.zoomTouchDistance > this.prevZoomDistance) this.zoomScale += ZOOM_INCREMENT;
         else this.zoomScale -= ZOOM_INCREMENT;
 
         this.prevZoomDistance = touchState.zoomTouchDistance;
+
+        const point = touchState.touches[0];
+        const secondTouch = touchState.touches[1];
+
+        const x = (point.x + secondTouch.x) / 2;
+        const y = (point.y + secondTouch.y) / 2;
+
+        const point2BeforeTransform = canvasLayer.globalToLocal(x, y);
 
         if(this.zoomScale > MAX_ZOOM) this.zoomScale = MAX_ZOOM;
         else if(this.zoomScale < MIN_ZOOM) this.zoomScale = MIN_ZOOM;
@@ -342,18 +392,21 @@ export default function(app) {
           canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
           this.updateAppStoreZoomIndex();
         }
-        // const point = canvasLayer.localToGlobal(pointerState.x, pointerState.y);
-        // const secondTouch = touchState.touches[1];
-        // const point2 = canvasLayer.localToGlobal(secondTouch.x, secondTouch.y);
 
-
-        // const x = (point.x + point2.x) / 2;
-        // const y = (point.y + point2.y) / 2;
+        const pointAfterTransform = canvasLayer.globalToLocal(x,y);
 
         // let xPos = 0;
         // let yPos = 0;
-        // graphGraphics.position.x += (afterTransform.x - beforeTransform.x) * graphGraphics.scale.x;
-        // graphGraphics.position.y += (afterTransform.y - beforeTransform.y) * graphGraphics.scale.y;
+        canvasLayer.x += (pointAfterTransform.x - point2BeforeTransform.x) * this.zoomScale;
+        canvasLayer.y += (pointAfterTransform.y - point2BeforeTransform.y) * this.zoomScale;
+
+        panZoomText.text = `Pan Zoom Text: {
+          x: ${canvasLayer.x.toFixed(2)},
+          y: ${canvasLayer.y.toFixed(2)},
+          zoom: ${this.zoomScale.toFixed(2)}
+        }`
+
+        alignDebugToolObjects();
       })
     }
 

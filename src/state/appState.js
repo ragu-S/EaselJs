@@ -44,6 +44,7 @@ class PixiPointerState {
   // Pointer Events
   @observable pointerDown = false;
   @observable pointerUp = false;
+  @observable pointerMove = false;
   @observable touchType = POINTER_TYPE.POINTER;
 
   // Pointer Coordinates

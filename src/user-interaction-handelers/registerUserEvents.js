@@ -19,6 +19,8 @@ export default function(app) {
     disabledMouseEvents = [];
     path = [];
     oneFingerDown = false;
+    touchDistancesEvents = 0;
+    touchDistanceAvg = 0;
     constructor(props) {
       stage.addEventListener('stagemousedown', this.onPointerDown);
       stage.addEventListener('stagemouseup', this.onPointerUp);
@@ -59,6 +61,9 @@ export default function(app) {
             x: touches[1].clientX,
             y: touches[1].clientY
           })
+
+          this.touchDistancesEvents = 0;
+          this.touchDistanceAvg = 0;
         }
         else {
           if(touchType === FINGER) {
@@ -88,6 +93,7 @@ export default function(app) {
     onPointerUp = (ev) => {
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
+        pointerState.pointerMove = false;
         pointerState.pointerDown = false;
         pointerState.pointerUp = true;
 
@@ -109,6 +115,9 @@ export default function(app) {
         }
       }
 
+      this.touchDistancesEvents = 0;
+      this.touchDistanceAvg = 0;
+
       this.oneFingerDown = false;
     }
 
@@ -116,38 +125,53 @@ export default function(app) {
     onPointerMove = (ev) => {
       // if(pointerState.pointerDown && !pointerState.pointerUp) {
       const { stageX, stageY, nativeEvent } = ev;
-      if(nativeEvent.touches && nativeEvent.touches.length === 2) {
+      if(!nativeEvent.touches) return;
+      if(!pointerState.pointerMove) pointerState.pointerMove = true;
+      if(nativeEvent.touches.length === 2) {
+        const touches = nativeEvent.touches;
         const distance = getDistanceBetween({
-          x: nativeEvent.touches[0].clientX,
-          y: nativeEvent.touches[0].clientY
+          x: touches[0].clientX,
+          y: touches[0].clientY
         }, {
-          x: nativeEvent.touches[1].clientX,
-          y: nativeEvent.touches[1].clientY
+          x: touches[1].clientX,
+          y: touches[1].clientY
         })
-        // let distanceBetween =  getDistanceBetween(
-        //   , {
-        //   x: nativeEvent.touches[1].clientX,
-        //   y: nativeEvent.touches[1].clientY
-        // });
-        console.log('settings pan values', distance);
-        if(Math.abs(distance - touchState.touchDownDistance) > 40) {
-          touchState.zoomTouchDistance = distance;
-        }
-        else if(
-        distance <= 90
-        ) {
 
-          const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
-          pointerState.x = x;
-          pointerState.y = y;
+        touchState.touches.replace(
+          [...touches].map(touch => {
+            return {
+              x: touch.clientX,
+              y: touch.clientY
+            }
+          })
+        )
+
+        this.touchDistancesEvents++;
+        // const oldAvg = this.touchDistanceAvg;
+        const newAvg = (this.touchDistanceAvg + distance)/this.touchDistancesEvents;
+        const dt = distance/newAvg;
+
+        if(this.touchDistancesEvents > 8) {
+          if(dt > 1.15 || dt < 0.95) {
+            console.log('zoomin!');
+            touchState.zoomTouchDistance = distance;
+            // const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
+            // pointerState.x = x;
+            // pointerState.y = y;
+          }
         }
+        this.touchDistanceAvg += newAvg;
+        // }
       }
       else {
         const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
         pointerState.x = x;
         pointerState.y = y;
+        touchState.touches.replace([{
+          x: nativeEvent.touches[0].clientX,
+          y: nativeEvent.touches[0].clientY
+        }])
       }
-      // }
     }
   }
 
