@@ -1,5 +1,5 @@
 // import app from '../app';
-import {when, reaction, autorun, action} from 'mobx'
+import {when, reaction, autorun, action, autorunAsync} from 'mobx'
 import { getPathBounds, centerCoords } from '../util/geometry-utils';
 import throttle from 'lodash.throttle';
 import debounce from 'lodash.debounce';
@@ -10,7 +10,7 @@ export default function(app) {
   const { appState, pointerState, drawToolState, quickToolState, touchState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
   const MIN_ZOOM = 0.3;
   const MAX_ZOOM = 10;
-  const ZOOM_INCREMENT = 0.1;
+  const ZOOM_INCREMENT = 1;
   const DEBUG_TOOL_MARGIN = {
     left: 5,
     top: 5,
@@ -306,10 +306,7 @@ export default function(app) {
       2) zooming is two fingers spread
       */
       this.panDisposer = autorun(() => {
-        console.log('pointerState.touchType', pointerState.touchType);
-        console.log('pointerState', pointerState.x, 'touches length', touchState.touches.length);
         if(touchState.touches.length === 1 && pointerState.touchType === FINGER && pointerState.pointerMove === true) {
-          console.log('panning');
           let returnEarly = false;
           let MAX_PAN_X = window.innerWidth * 1.5 * this.zoomScale;
           let MAX_PAN_Y = window.innerHeight * 1.5 * this.zoomScale;
@@ -371,49 +368,59 @@ export default function(app) {
         }
       })
 
-      this.zoomDisposer = reaction(() => touchState.zoomTouchDistance, () => {
-        if(touchState.touches.length <= 1) return;
-        if(touchState.zoomTouchDistance > this.prevZoomDistance) this.zoomScale += ZOOM_INCREMENT;
-        else this.zoomScale -= ZOOM_INCREMENT;
-
-        this.prevZoomDistance = touchState.zoomTouchDistance;
-
-        const point = touchState.touches[0];
-        const secondTouch = touchState.touches[1];
-
-        const x = (point.x + secondTouch.x) / 2;
-        const y = (point.y + secondTouch.y) / 2;
-
-        const point2BeforeTransform = canvasLayer.globalToLocal(x, y);
-
-        if(this.zoomScale > MAX_ZOOM) this.zoomScale = MAX_ZOOM;
-        else if(this.zoomScale < MIN_ZOOM) this.zoomScale = MIN_ZOOM;
-        else {
-          canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
-          this.updateAppStoreZoomIndex();
-        }
-
-        const pointAfterTransform = canvasLayer.globalToLocal(x,y);
-
-        // let xPos = 0;
-        // let yPos = 0;
-        canvasLayer.x += (pointAfterTransform.x - point2BeforeTransform.x) * this.zoomScale;
-        canvasLayer.y += (pointAfterTransform.y - point2BeforeTransform.y) * this.zoomScale;
-
-        panZoomText.text = `Pan Zoom Text: {
-          x: ${canvasLayer.x.toFixed(2)},
-          y: ${canvasLayer.y.toFixed(2)},
-          zoom: ${this.zoomScale.toFixed(2)}
-        }`
-
-        alignDebugToolObjects();
-      })
+      this.zoomDisposer = autorunAsync(this.throttledZoom, 60);
     }
 
-    updateAppStoreZoomIndex = debounce(action(() => {
-      console.log('setting zoom index');
-      appState.zoomIndex = this.zoomScale;
-    }), 150)
+    throttledZoom = () => {
+      if(touchState.touches.length <= 1) return;
+      if(touchState.zoomTouchDistance === this.prevZoomDistance) return;
+
+      const normalizedZoomIncrement = this.zoomScale < 1 ? ZOOM_INCREMENT/MAX_ZOOM : ZOOM_INCREMENT/2;
+
+      if(touchState.zoomTouchDistance > this.prevZoomDistance) this.zoomScale += normalizedZoomIncrement;
+      else this.zoomScale -= normalizedZoomIncrement;
+
+      this.prevZoomDistance = touchState.zoomTouchDistance;
+
+      console.log('zoomScale', this.zoomScale);
+
+      const point = touchState.touches[0];
+      const secondTouch = touchState.touches[1];
+
+      const x = (point.x + secondTouch.x) / 2;
+      const y = (point.y + secondTouch.y) / 2;
+
+      const point2BeforeTransform = canvasLayer.globalToLocal(x, y);
+
+      if(this.zoomScale > MAX_ZOOM) this.zoomScale = MAX_ZOOM;
+      else if(this.zoomScale < MIN_ZOOM) this.zoomScale = MIN_ZOOM;
+      else {
+        canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
+        this.updateAppStoreZoomIndex();
+      }
+
+      const pointAfterTransform = canvasLayer.globalToLocal(x,y);
+
+      // let xPos = 0;
+      // let yPos = 0;
+      canvasLayer.x += (pointAfterTransform.x - point2BeforeTransform.x) * this.zoomScale;
+      canvasLayer.y += (pointAfterTransform.y - point2BeforeTransform.y) * this.zoomScale;
+
+      panZoomText.text = `Pan Zoom Text: {
+        x: ${canvasLayer.x.toFixed(2)},
+        y: ${canvasLayer.y.toFixed(2)},
+        zoom: ${this.zoomScale.toFixed(2)}
+      }`
+
+      alignDebugToolObjects();
+    }
+
+    updateAppStoreZoomIndex = action(() => appState.zoomIndex = this.zoomScale);
+
+    // updateAppStoreZoomIndex = debounce(action(() => {
+    //   console.log('setting zoom index');
+    //   appState.zoomIndex = this.zoomScale;
+    // }), 150)
 
     centerCanvas = () => {
 
@@ -422,6 +429,8 @@ export default function(app) {
 
 
   class QuickTool {
+    previousClickTime = new Date()
+    toolAnimating = false
     // manages UI, tools, etc.
     // Pops up after user taps with one finger (or pointerUp, after moving for a while)
     constructor() {
@@ -442,11 +451,25 @@ export default function(app) {
       })
 
       userEventsListeners.on('onefingerclick', (ev) => {
-        quickToolState.showTool = !quickToolState.showTool;
+        if(this.toolAnimating === true) return;
+        if(quickToolState.showTool === true) {
+          quickToolState.showTool = false;
+          return;
+        }
+
+        const dateDiff = ev.timeStamp - this.previousClickTime;
+
+        this.previousClickTime = ev.timeStamp;
+
+        if(dateDiff < 400) {
+          quickToolState.showTool = true;
+        }
       })
     }
 
     showQuickTool = () => {
+      console.log('opening quick tool on double click');
+      // detecting double click
       this.graphics
           .setStrokeStyle()
           .beginStroke('#000000')
@@ -458,21 +481,11 @@ export default function(app) {
       this.shape.x = updated.x;
       this.shape.y = updated.y;
       this.shape.scaleX = this.shape.scaleY = 0;
+      this.toolAnimating = true;
 
       Tween.get(this.shape)
-       .to({ scaleX: 1, scaleY: 1, override: true, useTicks: true }, 500);
-
-      // const boundaryShape = new Shape();
-
-      // boundaryShape.graphics
-      //   .setStrokeStyle(2)
-      //   .beginStroke('#00ff00')
-      //   .drawRect(0,0)
-      //   .endStroke();
-
-      // stage.addChild(
-      //   boundaryShape
-      // );
+       .to({ scaleX: 1, scaleY: 1, override: true, useTicks: true }, 500)
+       .call(() => this.toolAnimating = false)
     }
 
     hideQuickTool = () => {

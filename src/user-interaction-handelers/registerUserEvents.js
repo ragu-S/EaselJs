@@ -39,6 +39,8 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
@@ -67,7 +69,6 @@ export default function(app) {
         }
         else {
           if(touchType === FINGER) {
-            console.log('finger touch!');
             this.oneFingerDown = true;
           }
           pointerState.pointerDown = true;
@@ -91,6 +92,8 @@ export default function(app) {
 
     @action
     onPointerUp = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         pointerState.pointerMove = false;
@@ -98,19 +101,16 @@ export default function(app) {
         pointerState.pointerUp = true;
 
         if(touchState.touches.length > 1) {
-          console.log('pointer Up, clearing touchlist');
           touchState.touches.clear();
           touchState.touchDownDistance = 0;
           touchState.zoomTouchDistance = 0;
         }
         else if(this.oneFingerDown === true) {
-          console.log('finger touch up, CLICK!', ev);
           this.oneFingerClick = true;
           const clickEvent = new Event('onefingerclick');
           clickEvent.nativeEvent = ev;
           clickEvent.stageX = ev.stageX;
           clickEvent.stageY = ev.stageY;
-
           this.dispatchEvent(clickEvent);
         }
       }
@@ -123,7 +123,9 @@ export default function(app) {
 
     @action
     onPointerMove = (ev) => {
-      // if(pointerState.pointerDown && !pointerState.pointerUp) {
+      ev.preventDefault();
+      ev.stopPropagation();
+
       const { stageX, stageY, nativeEvent } = ev;
       if(!nativeEvent.touches) return;
       if(!pointerState.pointerMove) pointerState.pointerMove = true;
@@ -147,21 +149,15 @@ export default function(app) {
         )
 
         this.touchDistancesEvents++;
-        // const oldAvg = this.touchDistanceAvg;
         const newAvg = (this.touchDistanceAvg + distance)/this.touchDistancesEvents;
         const dt = distance/newAvg;
 
         if(this.touchDistancesEvents > 8) {
           if(dt > 1.15 || dt < 0.95) {
-            console.log('zoomin!');
             touchState.zoomTouchDistance = distance;
-            // const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
-            // pointerState.x = x;
-            // pointerState.y = y;
           }
         }
         this.touchDistanceAvg += newAvg;
-        // }
       }
       else {
         const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
