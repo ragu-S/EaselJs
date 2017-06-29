@@ -16,18 +16,7 @@
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
     "mobx": "^3.1.11",
-    "pixi.js": "^4.5.2",
-    "react": "^15.3.2",
-    "react-addons-perf": "^15.3.2",
-    "react-async-script": "^0.9.1",
-    "react-dom": "^15.3.2",
-    "react-google-recaptcha": "^0.9.3",
-    "react-redux": "^4.4.4",
-    "react-router": "^2.1.1",
-    "react-router-redux": "^4.0.2",
-    "react-svg-inline": "^1.2.0",
-    "react-transition-group-plus": "^0.4.2",
-    "stats.js": "^0.17.0"
+    "pixi.js": "^4.5.2"
   },
   "devDependencies": {
     "autoprefixer": "^6.2.3",
@@ -57,6 +46,7 @@
     "postcss": "^5.0.14",
     "rfg-api": "^0.1.7",
     "rimraf": "^2.5.2",
+    "stats.js": "^0.17.0",
     "stringify": "3.2.0",
     "uglify-js": "^2.6.1"
   },

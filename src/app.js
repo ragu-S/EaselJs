@@ -63,17 +63,18 @@ class App {
 
   /* App RAF API */
   setUpRAFLoop = () => {
-    requestAnimationFrame(this.loop);
+    createjs.Ticker.addEventListener("tick", this.loop);
+    // requestAnimationFrame(this.loop);
   }
 
   loop = () => {
     // if(this.updateCanvas) this.render(this.stage);
-    if(this.updateCanvas) this.stage.update();
-    requestAnimationFrame(this.loop);
+    this.stage.update();
+    // requestAnimationFrame(this.loop);
   }
 
   loopOnce = () => {
-    if(this.updateCanvas) this.stage.update();
+    this.stage.update();
     // if(this.updateCanvas) this.render(this.stage);
   }
 

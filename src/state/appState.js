@@ -22,10 +22,16 @@ class AppState {
   @observable height = window.innerHeight;
   @observable zoomIndex = 1;
   @observable displayLayerBounds = extendShallowObservable({
-    x: 0,
-    y: 0,
-    width: window.innerWidth,
-    height : window.innerHeight
+    x1: 0,
+    y1: 0,
+    x2: window.innerWidth,
+    y2: window.innerHeight,
+    get width() {
+      return this.x2 - this.x1;
+    },
+    get height() {
+      return this.y2 - this.y1;
+    }
   });
 
   /* Tools */
@@ -60,7 +66,6 @@ class DrawTool {
   @observable fillColor = '#ff00FF';
   @observable strokeWidth = 1;
   @observable cachedScale = 1;
-
 }
 
 class QuickTool {
@@ -69,8 +74,11 @@ class QuickTool {
 }
 
 class CanvasObjects {
-  _drawnObjects = [];
-  _shapeObjects = [];
+  _drawnShapeObjectIds = {};
+  _shapeObjectIds = {};
+  @observable numPathsDrawn = 0;
+  @observable avgLineHeight = 0;
+  @observable recentShapeUpdatedId = null;
 
   @computed get lastDrawnObject() {
     return this._drawnObjects[this._drawnObjects.length - 1];

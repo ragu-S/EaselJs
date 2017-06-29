@@ -1,3 +1,31 @@
+
+
+export function contains(containerBounds, childBounds) {
+  return containerBounds.x1 <= childBounds.x1 &&
+    containerBounds.x2 >= childBounds.x2 &&
+    containerBounds.y1 <= childBounds.y1 &&
+    containerBounds.y2 >= childBounds.y2;
+}
+
+export function updateContainerBounds(containerBounds, newChildBounds) {
+  const { x1, y1, x2, y2 } = newChildBounds;
+  
+  if(containerBounds.x1 > x1) {
+    containerBounds.x1 = x1;
+  }
+  if(containerBounds.y1 > y1) {
+    containerBounds.y1 = y1;
+  }
+  if(containerBounds.x2 < x2) {
+    containerBounds.x2 = x2;
+  }
+  if(containerBounds.y2 < y2) {
+    containerBounds.y2 = y2;
+  }
+
+  return containerBounds;
+}
+
 export function getPathBounds(path, strokeWidth = 0) {
   var x1 = path[0];
   var y1 = path[1];

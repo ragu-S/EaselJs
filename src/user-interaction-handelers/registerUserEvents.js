@@ -22,9 +22,11 @@ export default function(app) {
     touchDistancesEvents = 0;
     touchDistanceAvg = 0;
     constructor(props) {
+      
       stage.addEventListener('stagemousedown', this.onPointerDown);
       stage.addEventListener('stagemouseup', this.onPointerUp);
       stage.addEventListener('stagemousemove', this.onPointerMove);
+
     }
 
     disableEvent = (eventName) => {
@@ -39,13 +41,13 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+      // ev.preventDefault();
+      // ev.stopPropagation();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
         let touchType = (touches[0].radiusX <= 0.2 || touches[0].radiusY <= 0.2) ? POINTER : FINGER;
-
+        console.log('touch length', nativeEvent.touches)
         if(touches.length > 1) {
           touchState.touches.replace(
             [...touches].map(touch => {
@@ -64,8 +66,11 @@ export default function(app) {
             y: touches[1].clientY
           })
 
+          console.log('touch down distance', touchState.touchDownDistance);
+
           this.touchDistancesEvents = 0;
           this.touchDistanceAvg = 0;
+          this.oneFingerDown = false;
         }
         else {
           if(touchType === FINGER) {
@@ -92,8 +97,8 @@ export default function(app) {
 
     @action
     onPointerUp = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+      // ev.preventDefault();
+      // ev.stopPropagation();
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         pointerState.pointerMove = false;
@@ -104,9 +109,9 @@ export default function(app) {
           touchState.touches.clear();
           touchState.touchDownDistance = 0;
           touchState.zoomTouchDistance = 0;
+          this.oneFingerDown = false;
         }
         else if(this.oneFingerDown === true) {
-          this.oneFingerClick = true;
           const clickEvent = new Event('onefingerclick');
           clickEvent.nativeEvent = ev;
           clickEvent.stageX = ev.stageX;
@@ -123,8 +128,8 @@ export default function(app) {
 
     @action
     onPointerMove = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+      // ev.preventDefault();
+      // ev.stopPropagation();
 
       const { stageX, stageY, nativeEvent } = ev;
       if(!nativeEvent.touches) return;
@@ -138,6 +143,8 @@ export default function(app) {
           x: touches[1].clientX,
           y: touches[1].clientY
         })
+
+        console.log('distance', distance);
 
         touchState.touches.replace(
           [...touches].map(touch => {

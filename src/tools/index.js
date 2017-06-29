@@ -1,6 +1,6 @@
 // import app from '../app';
 import {when, reaction, autorun, action, autorunAsync} from 'mobx'
-import { getPathBounds, centerCoords } from '../util/geometry-utils';
+import { getPathBounds, centerCoords, contains, updateContainerBounds } from '../util/geometry-utils';
 import throttle from 'lodash.throttle';
 import debounce from 'lodash.debounce';
 
@@ -17,6 +17,7 @@ export default function(app) {
     bottom: 5,
     right: 10
   };
+  const AVG_CHAR_PATH_LENGTH = 40;
   /* DEBUG */
   // const boundaryShape = new Shape();
 
@@ -57,12 +58,13 @@ export default function(app) {
     drawStarted = false; // internal state
     previousTouchType = POINTER;
     previousBounds = null;
-    leftMostBox = null;
-    rightMostBox = null;
-    topMostBox = null;
-    bottomMostBox = null;
     boundary = new Shape();
     cachedShape = null;
+
+    // Needed to detect new lines
+    newLineBounds = null;
+    prevPathBounds = null;
+    currentLineBounds = null;
     /*
      boundingBoxes
      leftMostBox
@@ -77,15 +79,20 @@ export default function(app) {
 
       this.shape = new Shape();
       this.cachedShape = new Shape();
+      this.charBox = new Shape();
+      this.newLineArea = new Shape();
+      this.currentLineArea = new Shape();
       canvasLayer.x = 0;
       canvasLayer.y = 0;
 
       canvasLayer.addChild(
+        this.boundary,
         this.shape,
-        this.cachedShape
+        this.cachedShape,
+        this.charBox,
+        this.newLineArea,
+        this.currentLineArea
       );
-
-      canvasLayer.addChild(this.boundary);
 
       // DEBUG
       // show debug values
@@ -111,14 +118,11 @@ export default function(app) {
       })
 
       reaction(() => {
-        // return [
-        //   ,
-        //   appState.displayLayerBounds
-        // ]
         return appState.zoomIndex;
       }, () => {
         console.log('updating cache');
-        const { x, y, width, height } = appState.displayLayerBounds;
+        const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
+        // console.log('cached x, y, width, height', x, y, width, height);
         this.cachedShape.cache(x,y,width,height,appState.zoomIndex);
       })
 
@@ -190,36 +194,98 @@ export default function(app) {
       const lastDrawSession = this.drawSession[this.drawSession.length - 1];
       const bounds = getPathBounds(lastDrawSession, this.strokeWidth);
 
-      if(this.previousBounds !== null) {
-        if(this.x1 > bounds.x1) this.x1 = bounds.x1;
-        if(this.y1 > bounds.y1) this.y1 = bounds.y1;
-        if(this.x2 < bounds.x2) this.x2 = bounds.x2;
-        if(this.y2 < bounds.y2) this.y2 = bounds.y2;
+      // First Draw
+      if(this.previousBounds === null) {
+        this.previousBounds = this.currentLineBounds = bounds;
+
+        // create newLine area
+        this.newLineBounds = {
+          ...bounds,
+          y2: bounds.y2 + (bounds.y2 - bounds.y1)
+        }
+
+        // update displayAreaBounds if bounds is not contained in current displayAreaBounds
       }
       else {
-        this.previousBounds = bounds;
+        // check path is not in newline area
+        const isNewLine = contains(this.newLineBounds, bounds);
 
-        this.x1 = bounds.x1;
-        this.y1 = bounds.y1;
-        this.x2 = bounds.x2;
-        this.y2 = bounds.y2;
+        if(isNewLine) {
+          this.currentLineBounds = bounds;
+
+          this.newLineBounds = {
+            ...bounds,
+            y2: bounds.y2 + (bounds.y2 - bounds.y1)
+          }
+
+          // Create new Shape container
+          // if(this.shape.id in canvasObjects._drawnShapeObjects) throw new Error('Old Shape ID in _drawnShapeObjects before insertion!');
+          // const shapeBounds = this.shape.getBounds();
+
+          // const newCache = new Shape();
+          // canvasLayer.addChild(newCache);
+          // newCache.
+          // canvasObjects._drawnShapeObjects[this.shape.id] = this.shape;
+        }
+        // Same line and user continued drawing this session
+        else {
+          updateContainerBounds(this.currentLineBounds, bounds);
+
+          this.newLineBounds = {
+            ...this.currentLineBounds,
+            y2: this.currentLineBounds.y2 + (this.currentLineBounds.y2 - this.currentLineBounds.y1)
+          }
+        }
+
+
+        // Check path length > AVG_CHAR_PATH_LENGTH
+        if(lastDrawSession.length >= AVG_CHAR_PATH_LENGTH) {
+          this.avgCharBounds = bounds;
+        }
       }
 
+      // Update container to ensure it encomposses the new bounds object
+      updateContainerBounds(appState.displayLayerBounds, bounds);
+
+      if(!contains(appState.displayLayerBounds, bounds)) debugger;
+
       this.drawBoundaryBox = {
-        x1: this.x1,
-        y1: this.y1,
-        x2: this.x2,
-        y2: this.y2
+        x1: appState.displayLayerBounds.x1,
+        y1: appState.displayLayerBounds.y1,
+        x2: appState.displayLayerBounds.x2,
+        y2: appState.displayLayerBounds.y2
       }
 
       this.shape.setBounds(
-        this.drawBoundaryBox.x1,
-        this.drawBoundaryBox.y1,
-        this.drawBoundaryBox.x2 - this.drawBoundaryBox.x1,
-        this.drawBoundaryBox.y2 - this.drawBoundaryBox.y1
+        this.currentLineBounds.x1,
+        this.currentLineBounds.y1,
+        this.currentLineBounds.x2 - this.currentLineBounds.x1,
+        this.currentLineBounds.y2 - this.currentLineBounds.y1
       )
 
-      appState.displayLayerBounds = this.shape.getBounds();
+      this.currentLineArea.graphics
+          .clear()
+          .setStrokeStyle(1)
+          .beginStroke('#792E10')
+          .drawRect(
+            this.currentLineBounds.x1,
+            this.currentLineBounds.y1,
+            this.currentLineBounds.x2 - this.currentLineBounds.x1,
+            this.currentLineBounds.y2 - this.currentLineBounds.y1
+          )
+          .endStroke()
+
+      this.newLineArea.graphics
+        .clear()
+        .setStrokeStyle(1)
+        .beginStroke('#340F51')
+        .drawRect(
+          this.newLineBounds.x1,
+          this.newLineBounds.y1,
+          this.newLineBounds.x2 - this.newLineBounds.x1,
+          this.newLineBounds.y2 - this.newLineBounds.y1
+        )
+        .endStroke()
 
       this.boundary.graphics
         .clear()
@@ -232,28 +298,22 @@ export default function(app) {
           this.drawBoundaryBox.y2 - this.drawBoundaryBox.y1
         )
         .endStroke()
-
+        
       displayObjectText.text =
         `DisplayLayerBounds: {
-          x:${appState.displayLayerBounds.x.toFixed(2)},
-          y:${appState.displayLayerBounds.y.toFixed(2)},
+          x:${appState.displayLayerBounds.x1.toFixed(2)},
+          y:${appState.displayLayerBounds.y1.toFixed(2)},
           width:${appState.displayLayerBounds.width.toFixed(2)},
           height:${appState.displayLayerBounds.height.toFixed(2)}
         }`;
 
       alignDebugToolObjects(all_debug_tools);
 
+      this.previousBounds = bounds;
+
       if(this.cacheResult) clearTimeout(this.cacheResult);
-      // if(this.drawSession.length < 4) return;
 
       this.cacheResult = setTimeout(this.updateCache, 1500);
-      // const shape = new Shape();
-      // shape.graphics
-      //   .setStrokeStyle(1)
-      //   .beginStroke('#FF0000')
-      //   .drawRect(bounds.x1, bounds.y1, bounds.x2 - bounds.x1, bounds.y2 - bounds.y1)
-      //   .endStroke()
-      // canvasLayer.addChild(shape);
     }
 
     draw = () => {
@@ -272,8 +332,8 @@ export default function(app) {
 
     updateCache = () => {
       console.log('setting new cache!');
-      const { x, y, width, height } = appState.displayLayerBounds;
-
+      const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
+      console.log('x,y,width,height', x, y, width, height);
       const updates = new Graphics()
         .setStrokeStyle(this.strokeWidth)
         .beginStroke(this.strokeColor)
@@ -358,7 +418,7 @@ export default function(app) {
             x: ${canvasLayer.x.toFixed(2)},
             y: ${canvasLayer.y.toFixed(2)},
             zoom: ${this.zoomScale.toFixed(2)}
-          }`
+          }`;
 
           alignDebugToolObjects();
         }
