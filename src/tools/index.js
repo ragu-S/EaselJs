@@ -1,5 +1,5 @@
 // import app from '../app';
-import {when, reaction, autorun, action, autorunAsync} from 'mobx'
+import { untracked, reaction, autorun, action, autorunAsync } from 'mobx'
 import { getPathBounds, centerCoords, contains, updateContainerBounds } from '../util/geometry-utils';
 import throttle from 'lodash.throttle';
 import debounce from 'lodash.debounce';
@@ -7,7 +7,7 @@ import debounce from 'lodash.debounce';
 export default function(app) {
   const { CREATEJS, state, stage, canvasLayer, userEventsListeners } = app;
   const { Graphics, Shape, Tween } = CREATEJS;
-  const { appState, pointerState, drawToolState, quickToolState, touchState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
+  const { appState, pointerState, drawToolState, quickToolState, touchState, zoomState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
   const MIN_ZOOM = 0.3;
   const MAX_ZOOM = 10;
   const ZOOM_INCREMENT = 1;
@@ -65,13 +65,7 @@ export default function(app) {
     newLineBounds = null;
     prevPathBounds = null;
     currentLineBounds = null;
-    /*
-     boundingBoxes
-     leftMostBox
-     rightMostBox
-     topMostBox
-     bottomMostBox
-     */
+
     constructor() {
       this.listen();
 
@@ -99,6 +93,7 @@ export default function(app) {
 
       // Listen to style changes
       autorun(() => {
+        console.log('track draw states');
         if(drawToolState.edited === true) {
           console.log(
             'strokeColor', drawToolState.strokeColor,
@@ -117,14 +112,15 @@ export default function(app) {
         }
       })
 
-      reaction(() => {
-        return appState.zoomIndex;
-      }, () => {
-        console.log('updating cache');
+      autorunAsync(() => {
+        const scaleX = this.cachedShape.scaleX;
+        const zoom = zoomState.zoom;
+        if(scaleX === zoom) return;
+        const zoomChange = (zoom - scaleX) / scaleX;
+
         const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
-        // console.log('cached x, y, width, height', x, y, width, height);
-        this.cachedShape.cache(x,y,width,height,appState.zoomIndex);
-      })
+        this.cachedShape.cache(x,y,width,height,zoom);
+      }, 600);
 
       window._drawTool = this;
     }
@@ -175,9 +171,9 @@ export default function(app) {
       const x = pointerState.x;
       const y = pointerState.y;
       const path = this.drawSession[this.drawSession.length - 1];
-      // Detect any touch values outside of the range of current values (instrument error)
       const lastIndex = path.length - 1;//path[];
 
+      // Detect any touch values outside of the range of current values (instrument error)
       if(Math.abs(y - path[lastIndex]) < 0.05 || Math.abs(x - path[lastIndex - 1]) < 0.05) return;
 
       this.drawSession[this.drawSession.length - 1] = path.concat([x,y]);
@@ -237,7 +233,6 @@ export default function(app) {
           }
         }
 
-
         // Check path length > AVG_CHAR_PATH_LENGTH
         if(lastDrawSession.length >= AVG_CHAR_PATH_LENGTH) {
           this.avgCharBounds = bounds;
@@ -245,9 +240,7 @@ export default function(app) {
       }
 
       // Update container to ensure it encomposses the new bounds object
-      updateContainerBounds(appState.displayLayerBounds, bounds);
-
-      if(!contains(appState.displayLayerBounds, bounds)) debugger;
+      if(!contains(appState.displayLayerBounds, bounds)) updateContainerBounds(appState.displayLayerBounds, bounds);
 
       this.drawBoundaryBox = {
         x1: appState.displayLayerBounds.x1,
@@ -331,9 +324,8 @@ export default function(app) {
     }
 
     updateCache = () => {
-      console.log('setting new cache!');
       const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
-      console.log('x,y,width,height', x, y, width, height);
+
       const updates = new Graphics()
         .setStrokeStyle(this.strokeWidth)
         .beginStroke(this.strokeColor)
@@ -344,7 +336,7 @@ export default function(app) {
 
       this.cachedShape.set({graphics: updates})
 
-      this.cachedShape.cache(x,y,width,height,appState.zoomIndex);
+      this.cachedShape.cache(x,y,width,height,zoomState.zoom);
       this.shape.graphics.clear();
       this.drawSession = [];
     }
@@ -355,7 +347,6 @@ export default function(app) {
     originalY = -1;
     zoomScale = 1;
     mainLayerScale = 1;
-    prevZoomDistance = 0;
     constructor() {
       window._PAN = this;
       this.initialized = false;
@@ -365,6 +356,7 @@ export default function(app) {
 
       2) zooming is two fingers spread
       */
+
       this.panDisposer = autorun(() => {
         if(touchState.touches.length === 1 && pointerState.touchType === FINGER && pointerState.pointerMove === true) {
           let returnEarly = false;
@@ -426,43 +418,23 @@ export default function(app) {
           this.originalX = -1;
           this.originalY = -1;
         }
-      })
+      });
 
-      this.zoomDisposer = autorunAsync(this.throttledZoom, 60);
+      this.zoomDisposer = autorun(this.throttledZoom);
     }
 
     throttledZoom = () => {
-      if(touchState.touches.length <= 1) return;
-      if(touchState.zoomTouchDistance === this.prevZoomDistance) return;
+      if(touchState.touches.length <= 1 || this.zoomScale === zoomState.zoom) return;
+      this.zoomScale = zoomState.zoom;
 
-      const normalizedZoomIncrement = this.zoomScale < 1 ? ZOOM_INCREMENT/MAX_ZOOM : ZOOM_INCREMENT/2;
-
-      if(touchState.zoomTouchDistance > this.prevZoomDistance) this.zoomScale += normalizedZoomIncrement;
-      else this.zoomScale -= normalizedZoomIncrement;
-
-      this.prevZoomDistance = touchState.zoomTouchDistance;
-
-      console.log('zoomScale', this.zoomScale);
-
-      const point = touchState.touches[0];
-      const secondTouch = touchState.touches[1];
-
-      const x = (point.x + secondTouch.x) / 2;
-      const y = (point.y + secondTouch.y) / 2;
+      const {x,y} = zoomState;
 
       const point2BeforeTransform = canvasLayer.globalToLocal(x, y);
 
-      if(this.zoomScale > MAX_ZOOM) this.zoomScale = MAX_ZOOM;
-      else if(this.zoomScale < MIN_ZOOM) this.zoomScale = MIN_ZOOM;
-      else {
-        canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
-        this.updateAppStoreZoomIndex();
-      }
+      canvasLayer.set({ scaleX: this.zoomScale, scaleY: this.zoomScale });
 
       const pointAfterTransform = canvasLayer.globalToLocal(x,y);
 
-      // let xPos = 0;
-      // let yPos = 0;
       canvasLayer.x += (pointAfterTransform.x - point2BeforeTransform.x) * this.zoomScale;
       canvasLayer.y += (pointAfterTransform.y - point2BeforeTransform.y) * this.zoomScale;
 
@@ -474,13 +446,6 @@ export default function(app) {
 
       alignDebugToolObjects();
     }
-
-    updateAppStoreZoomIndex = action(() => appState.zoomIndex = this.zoomScale);
-
-    // updateAppStoreZoomIndex = debounce(action(() => {
-    //   console.log('setting zoom index');
-    //   appState.zoomIndex = this.zoomScale;
-    // }), 150)
 
     centerCanvas = () => {
 
@@ -495,7 +460,7 @@ export default function(app) {
     // Pops up after user taps with one finger (or pointerUp, after moving for a while)
     constructor() {
       window.QUICKTOOL = this;
-
+      const { hammerjs } = userEventsListeners;
       this.shape = new Shape();
       this.graphics = this.shape.graphics;
       this.radius = Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.4);
@@ -510,25 +475,28 @@ export default function(app) {
         else this.hideQuickTool()
       })
 
-      userEventsListeners.on('onefingerclick', (ev) => {
-        if(this.toolAnimating === true) return;
-        if(quickToolState.showTool === true) {
-          quickToolState.showTool = false;
-          return;
-        }
+      //hammerjs.on('doubletap', this.doubleTapHandler);
+    }
 
-        const dateDiff = ev.timeStamp - this.previousClickTime;
+    @action
+    doubleTapHandler = ev => {
+      console.log('click showTool', quickToolState.showTool);
+      if(this.toolAnimating === true) return;
+      quickToolState.showTool = !quickToolState.showTool;
+      // const dateDiff = ev.timeStamp - this.previousClickTime;
 
-        this.previousClickTime = ev.timeStamp;
+      // this.previousClickTime = ev.timeStamp;
 
-        if(dateDiff < 400) {
-          quickToolState.showTool = true;
-        }
-      })
+      // if(dateDiff < 400) {
+      //   quickToolState.showTool = true;
+      // }
+    }
+
+    singleTapHandler = ev => {
+      console.log('single tap');
     }
 
     showQuickTool = () => {
-      console.log('opening quick tool on double click');
       // detecting double click
       this.graphics
           .setStrokeStyle()

@@ -20,7 +20,7 @@ class AppState {
   // Canvas display settings
   @observable width = window.innerWidth;
   @observable height = window.innerHeight;
-  @observable zoomIndex = 1;
+
   @observable displayLayerBounds = extendShallowObservable({
     x1: 0,
     y1: 0,
@@ -42,8 +42,17 @@ class AppState {
 class TouchState {
   @observable touches = [];
   @observable touchDownDistance = 0;
+}
+
+class ZoomState {
+  _scale = null;
+  _distance = 0;
+  @observable zoom = 1;
+  @observable x = 0;
+  @observable y = 0;
   @observable zoomTouchDistance = 0;
-  @observable zooming = false;
+  MAX_ZOOM = 10;
+  MIN_ZOOM = 0.3;
 }
 
 class PixiPointerState {
@@ -93,12 +102,14 @@ const pointerState = new PixiPointerState();
 const touchState = new TouchState();
 const canvasObjects = new CanvasObjects();
 const quickToolState = new QuickTool();
+const zoomState = new ZoomState();
 
 const state = {
   appState,
   drawToolState,
   pointerState,
   touchState,
+  zoomState,
   canvasObjects,
   quickToolState,
   TOOLS,

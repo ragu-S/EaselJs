@@ -1,10 +1,11 @@
 'use strict';
 import { action, autorun } from 'mobx';
 import { getDistanceBetween } from '../util/geometry-utils';
+import * as Hammer from 'hammerjs';
 
 // Singleton factory
 export default function(app) {
-  const {CREATEJS, stage, canvasLayer, state, interactionManager, renderer} = app;
+  const {CREATEJS, stage, canvasLayer, state, interactionManager, renderer, canvas} = app;
   const MOUSE_EVENTS = [
     'pointerleave',
     'pointerenter',
@@ -14,19 +15,29 @@ export default function(app) {
   ];
 
   const { Graphics, EventDispatcher, Event } = CREATEJS;
-  const { pointerState, touchState, POINTER_TYPE: { POINTER, FINGER } } = state;
+  const { pointerState, touchState, zoomState, POINTER_TYPE: { POINTER, FINGER } } = state;
   class UserEventListeners {
     disabledMouseEvents = [];
     path = [];
     oneFingerDown = false;
     touchDistancesEvents = 0;
     touchDistanceAvg = 0;
+
     constructor(props) {
-      
+      var hammerjs = new Hammer.Manager(canvas);
+      // hammerjs.add(new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 5 }));
+      hammerjs.add(new Hammer.Tap({ event: 'doubletap', taps: 2 }));
+      hammerjs.add(new Hammer.Tap({ event: 'singletap', taps: 1 }));
+      hammerjs.add(new Hammer.Pinch({ threshold: 0.2 }));
+
+      hammerjs.on('pinchin', this.onPinchInOut);
+      hammerjs.on('pinchout', this.onPinchInOut);
+
       stage.addEventListener('stagemousedown', this.onPointerDown);
       stage.addEventListener('stagemouseup', this.onPointerUp);
       stage.addEventListener('stagemousemove', this.onPointerMove);
 
+      this.hammerjs = hammerjs;
     }
 
     disableEvent = (eventName) => {
@@ -41,13 +52,12 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
-      // ev.preventDefault();
-      // ev.stopPropagation();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
         let touchType = (touches[0].radiusX <= 0.2 || touches[0].radiusY <= 0.2) ? POINTER : FINGER;
-        console.log('touch length', nativeEvent.touches)
+        pointerState.touchType = touchType;
+
         if(touches.length > 1) {
           touchState.touches.replace(
             [...touches].map(touch => {
@@ -57,16 +67,6 @@ export default function(app) {
               }
             })
           )
-
-          touchState.touchDownDistance = getDistanceBetween({
-            x: touches[0].clientX,
-            y: touches[0].clientY
-          }, {
-            x: touches[1].clientX,
-            y: touches[1].clientY
-          })
-
-          console.log('touch down distance', touchState.touchDownDistance);
 
           this.touchDistancesEvents = 0;
           this.touchDistanceAvg = 0;
@@ -82,70 +82,66 @@ export default function(app) {
           pointerState.x = x;
           pointerState.y = y;
         }
-
-        pointerState.touchType = touchType;
       }
       else {
         console.log('mouse event');
       }
     }
 
+    @action
+    onPinchInOut = ev => {
+      if(zoomState._scale === null) {
+        zoomState._scale = ev.scale;
+        return;
+      }
 
-    onOneFingerTouch = (ev) => {
-      const { stageX, stageY, nativeEvent } = ev;
+      const zoomDiff = ev.scale - zoomState._scale;
+      const updatedZoom = (zoomDiff * zoomState.zoom) + zoomState.zoom;
+
+      if(zoomState.MIN_ZOOM < updatedZoom && updatedZoom < zoomState.MAX_ZOOM) {
+        zoomState.zoom = updatedZoom;
+        zoomState.x = ev.center.x;
+        zoomState.y = ev.center.y;
+        zoomState.zoomTouchDistance = ev.distance;
+        zoomState._scale = ev.scale;
+      }
+      // // pinch in
+      // if(ev.type === 'pinchin') {
+      // }
+      // // pinch out
+      // else {
+      // }
     }
 
     @action
     onPointerUp = (ev) => {
-      // ev.preventDefault();
-      // ev.stopPropagation();
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         pointerState.pointerMove = false;
         pointerState.pointerDown = false;
         pointerState.pointerUp = true;
+        zoomState._scale = null;
 
-        if(touchState.touches.length > 1) {
+        if(nativeEvent.touches > 1) {
           touchState.touches.clear();
           touchState.touchDownDistance = 0;
           touchState.zoomTouchDistance = 0;
           this.oneFingerDown = false;
         }
-        else if(this.oneFingerDown === true) {
-          const clickEvent = new Event('onefingerclick');
-          clickEvent.nativeEvent = ev;
-          clickEvent.stageX = ev.stageX;
-          clickEvent.stageY = ev.stageY;
-          this.dispatchEvent(clickEvent);
-        }
       }
 
       this.touchDistancesEvents = 0;
       this.touchDistanceAvg = 0;
-
       this.oneFingerDown = false;
     }
 
     @action
     onPointerMove = (ev) => {
-      // ev.preventDefault();
-      // ev.stopPropagation();
-
       const { stageX, stageY, nativeEvent } = ev;
-      if(!nativeEvent.touches) return;
-      if(!pointerState.pointerMove) pointerState.pointerMove = true;
+      if(nativeEvent.touches === undefined) return;
+      if(pointerState.pointerMove === false) pointerState.pointerMove = true;
+      const touches = nativeEvent.touches;
       if(nativeEvent.touches.length === 2) {
-        const touches = nativeEvent.touches;
-        const distance = getDistanceBetween({
-          x: touches[0].clientX,
-          y: touches[0].clientY
-        }, {
-          x: touches[1].clientX,
-          y: touches[1].clientY
-        })
-
-        console.log('distance', distance);
-
         touchState.touches.replace(
           [...touches].map(touch => {
             return {
@@ -154,17 +150,6 @@ export default function(app) {
             }
           })
         )
-
-        this.touchDistancesEvents++;
-        const newAvg = (this.touchDistanceAvg + distance)/this.touchDistancesEvents;
-        const dt = distance/newAvg;
-
-        if(this.touchDistancesEvents > 8) {
-          if(dt > 1.15 || dt < 0.95) {
-            touchState.zoomTouchDistance = distance;
-          }
-        }
-        this.touchDistanceAvg += newAvg;
       }
       else {
         const { x, y } = canvasLayer.globalToLocal(stageX, stageY);
@@ -177,8 +162,6 @@ export default function(app) {
       }
     }
   }
-
-  EventDispatcher.initialize(UserEventListeners.prototype);
 
   return new UserEventListeners();
 }

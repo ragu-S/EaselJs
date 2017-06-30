@@ -56,6 +56,7 @@ class App {
       stage: this.stage,
       canvasLayer: this.canvasLayer,
       state: this.state,
+      canvas: this.canvas
       // interactionManager: this.interactionManager,
       // renderer
     });
