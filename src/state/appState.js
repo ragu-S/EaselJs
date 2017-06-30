@@ -21,7 +21,7 @@ class AppState {
   @observable width = window.innerWidth;
   @observable height = window.innerHeight;
 
-  @observable displayLayerBounds = extendShallowObservable({
+  @observable displayLayerBounds = {
     x1: 0,
     y1: 0,
     x2: window.innerWidth,
@@ -32,7 +32,7 @@ class AppState {
     get height() {
       return this.y2 - this.y1;
     }
-  });
+  };
 
   /* Tools */
   @observable showTools = false;
@@ -83,8 +83,8 @@ class QuickTool {
 }
 
 class CanvasObjects {
-  _drawnShapeObjectIds = {};
-  _shapeObjectIds = {};
+  _drawnShapeObjects = {};
+  _shapeObjects = {};
   @observable numPathsDrawn = 0;
   @observable avgLineHeight = 0;
   @observable recentShapeUpdatedId = null;

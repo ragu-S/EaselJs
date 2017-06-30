@@ -1,6 +1,7 @@
 import App from './app';
 const createjs = require('createjs-browserify');
 import { spy } from 'mobx';
+import { addStageRef } from './util/debug-stats-tool';
 
 window.addEventListener('load', () => {
   const debugQueryParams = location.search.includes('debug') ? location.search.match(/(debug=)([0-9]+)(?=&|$)/i) : 0;
@@ -15,6 +16,9 @@ window.addEventListener('load', () => {
   setUpCanvas();
 
   setUpRAFLoop();
+
+  // DEBUG tools
+  addStageRef(App.stage);
 
   setUpTools();
 

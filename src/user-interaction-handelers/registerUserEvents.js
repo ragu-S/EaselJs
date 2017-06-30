@@ -25,7 +25,6 @@ export default function(app) {
 
     constructor(props) {
       var hammerjs = new Hammer.Manager(canvas);
-      // hammerjs.add(new Hammer.Pan({ direction: Hammer.DIRECTION_ALL, threshold: 5 }));
       hammerjs.add(new Hammer.Tap({ event: 'doubletap', taps: 2 }));
       hammerjs.add(new Hammer.Tap({ event: 'singletap', taps: 1 }));
       hammerjs.add(new Hammer.Pinch({ threshold: 0.2 }));
@@ -52,6 +51,7 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
+      ev.preventDefault();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
@@ -115,6 +115,7 @@ export default function(app) {
 
     @action
     onPointerUp = (ev) => {
+      ev.preventDefault();
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         pointerState.pointerMove = false;
@@ -137,6 +138,7 @@ export default function(app) {
 
     @action
     onPointerMove = (ev) => {
+      ev.preventDefault();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches === undefined) return;
       if(pointerState.pointerMove === false) pointerState.pointerMove = true;

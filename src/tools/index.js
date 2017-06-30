@@ -1,56 +1,36 @@
-// import app from '../app';
-import { untracked, reaction, autorun, action, autorunAsync } from 'mobx'
-import { getPathBounds, centerCoords, contains, updateContainerBounds } from '../util/geometry-utils';
-import throttle from 'lodash.throttle';
-import debounce from 'lodash.debounce';
+import {
+  untracked,
+  reaction,
+  autorun,
+  action,
+  autorunAsync
+} from 'mobx';
+
+import { getPathBounds,
+  centerCoords,
+  contains,
+  updateContainerBounds,
+  linest
+} from '../util/geometry-utils';
+
+import { debugTracker } from '../util/debug-stats-tool';
+
+import {
+  initDebugBoundingShapes,
+  debugCurrentLineArea,
+  debugDisplayArea,
+  debugNewLineArea,
+  debugBoundsBox,
+  debugCurrentLinearLineSession,
+  debugLinearLine
+} from '../util/debug-bounding-shapes';
 
 export default function(app) {
   const { CREATEJS, state, stage, canvasLayer, userEventsListeners } = app;
   const { Graphics, Shape, Tween } = CREATEJS;
   const { appState, pointerState, drawToolState, quickToolState, touchState, zoomState, canvasObjects, TOOLS, POINTER_TYPE: { POINTER, FINGER } } = state;
-  const MIN_ZOOM = 0.3;
-  const MAX_ZOOM = 10;
-  const ZOOM_INCREMENT = 1;
-  const DEBUG_TOOL_MARGIN = {
-    left: 5,
-    top: 5,
-    bottom: 5,
-    right: 10
-  };
   const AVG_CHAR_PATH_LENGTH = 40;
-  /* DEBUG */
-  // const boundaryShape = new Shape();
-
-  // boundaryShape.graphics
-  //   .setStrokeStyle(2)
-  //   .beginStroke('#00ff00')
-  //   .drawRect(0,0)
-  //   .endStroke();
-
-  // stage.addChild(
-  //   boundaryShape
-  // );
-  let all_debug_tools = [];
-  function alignDebugToolObjects() {
-    let curYLine = 0;
-    all_debug_tools.forEach(t => {
-      const { width, height } = t.getBounds();
-      t.x = window.innerWidth - (width + DEBUG_TOOL_MARGIN.right);
-      t.y = curYLine + parseInt(t.font) + (DEBUG_TOOL_MARGIN.top);
-      curYLine = (height + DEBUG_TOOL_MARGIN.top);
-    })
-  }
-
-  const displayObjectText = new CREATEJS.Text("displayObjectText", "12px Arial", "#ff7700");
-  const panZoomText = new CREATEJS.Text("panZoomText", "12px Arial", "#ff0592");
-  displayObjectText.textBaseline = "alphabetic";
-  panZoomText.textBaseline = "alphabetic";
-
-  stage.addChild(displayObjectText, panZoomText);
-
-  all_debug_tools = all_debug_tools.concat(displayObjectText, panZoomText)
-
-  alignDebugToolObjects(all_debug_tools);
+  window.globalDrawSession = [];
 
   // Draw Tool, gets instantiated when user clicks
   class DrawTool {
@@ -58,7 +38,6 @@ export default function(app) {
     drawStarted = false; // internal state
     previousTouchType = POINTER;
     previousBounds = null;
-    boundary = new Shape();
     cachedShape = null;
 
     // Needed to detect new lines
@@ -70,26 +49,51 @@ export default function(app) {
       this.listen();
 
       this.drawSession = [];
+      this.lineSessions = [];
 
       this.shape = new Shape();
       this.cachedShape = new Shape();
-      this.charBox = new Shape();
-      this.newLineArea = new Shape();
-      this.currentLineArea = new Shape();
+
+      canvasLayer.addChild(
+        this.shape,
+        this.cachedShape
+      );
+
+      canvasObjects._drawnShapeObjects[this.shape.id] = this.shape;
+      canvasObjects._drawnShapeObjects[this.cachedShape.id] = this.cachedShape;
+
       canvasLayer.x = 0;
       canvasLayer.y = 0;
 
-      canvasLayer.addChild(
-        this.boundary,
-        this.shape,
-        this.cachedShape,
-        this.charBox,
-        this.newLineArea,
-        this.currentLineArea
-      );
+      window._canvasObjects = canvasObjects;
 
-      // DEBUG
-      // show debug values
+      /* DEBUG */
+      const displayAreaBounds = new Shape();
+      const boundsBox = new Shape();
+      const newLineArea = new Shape();
+      const currentLineArea = new Shape();
+      const linearLine = new Shape();
+      const currentLinearLine = new Shape();
+
+      initDebugBoundingShapes({
+        shape: this.shape,
+        cachedShape: this.cachedShape,
+        displayAreaBounds,
+        boundsBox,
+        newLineArea,
+        currentLineArea,
+        linearLine,
+        currentLinearLine
+      });
+
+      canvasLayer.addChild(
+        displayAreaBounds,
+        boundsBox,
+        newLineArea,
+        currentLineArea,
+        linearLine,
+        currentLinearLine
+      );
 
       // Listen to style changes
       autorun(() => {
@@ -116,11 +120,15 @@ export default function(app) {
         const scaleX = this.cachedShape.scaleX;
         const zoom = zoomState.zoom;
         if(scaleX === zoom) return;
-        const zoomChange = (zoom - scaleX) / scaleX;
 
         const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
         this.cachedShape.cache(x,y,width,height,zoom);
       }, 600);
+
+      autorun(() => {
+        console.log('call debugging appState.displayAreaBounds');
+        debugDisplayArea(appState.displayLayerBounds);
+      })
 
       window._drawTool = this;
     }
@@ -156,6 +164,7 @@ export default function(app) {
     onDrawStart = () => {
       this.drawStarted = true;
       const { x, y } = pointerState;
+      // check if something lies beneath point
 
       const { strokeColor, fillColor, strokeWidth } = drawToolState;
       this.drawSession.push([x,y]);
@@ -185,10 +194,26 @@ export default function(app) {
     onDrawStop = () => {
       this.drawStarted = false;
       window.PATH = this.path;
+      if(this.cacheResult) clearTimeout(this.cacheResult);
 
       /* Shows bounding box for text paths */
       const lastDrawSession = this.drawSession[this.drawSession.length - 1];
+
       const bounds = getPathBounds(lastDrawSession, this.strokeWidth);
+
+      window.globalDrawSession = window.globalDrawSession.concat(lastDrawSession);
+
+      window.LINEAR_LINE = linest(window.globalDrawSession);
+
+      const currentLinearLine = linest(lastDrawSession);
+      debugCurrentLinearLineSession(currentLinearLine);
+      debugLinearLine(LINEAR_LINE);
+      debugBoundsBox(bounds);
+      // const newSession = this.lineSessions.concat(lastDrawSession);
+      // const linePath = linest(newSession);
+      console.log('currentLineBounds', this.currentLineBounds);
+      console.log('newLineBounds', this.newLineBounds);
+      console.log('bounds', bounds);
 
       // First Draw
       if(this.previousBounds === null) {
@@ -196,7 +221,9 @@ export default function(app) {
 
         // create newLine area
         this.newLineBounds = {
-          ...bounds,
+          x1: bounds.x1,
+          y1: bounds.y2,
+          x2: bounds.x2,
           y2: bounds.y2 + (bounds.y2 - bounds.y1)
         }
 
@@ -207,28 +234,50 @@ export default function(app) {
         const isNewLine = contains(this.newLineBounds, bounds);
 
         if(isNewLine) {
+          if(this.cacheResult) {
+            clearTimeout(this.cacheResult);
+            this.cacheResult = null;
+          }
+          //debugger;
+          // Create new Shape container
+          const oldShape = this.shape;
+          const newShape = new Shape();
+
+          canvasLayer.addChild(newShape);
+
+          this.shape = newShape;
+
+          // Cache old shape
+          const { x1, x2, y1, y2 } = this.currentLineBounds;
+          
+          // oldShape.cache( // this.cachedShape.cache(x,y,width,height,zoom);
+          //   x1,
+          //   y1,
+          //   x2-x1,
+          //   y2-y1,
+          //   zoomState.zoom
+          // );
+
+          if(newShape.id in canvasObjects._drawnShapeObjects) throw new Error('Old Shape ID in _drawnShapeObjects before insertion!');
+          else canvasObjects._drawnShapeObjects[newShape.id] = newShape;
+
           this.currentLineBounds = bounds;
 
           this.newLineBounds = {
-            ...bounds,
+            x1: bounds.x1,
+            y1: bounds.y2,
+            x2: bounds.x2,
             y2: bounds.y2 + (bounds.y2 - bounds.y1)
           }
-
-          // Create new Shape container
-          // if(this.shape.id in canvasObjects._drawnShapeObjects) throw new Error('Old Shape ID in _drawnShapeObjects before insertion!');
-          // const shapeBounds = this.shape.getBounds();
-
-          // const newCache = new Shape();
-          // canvasLayer.addChild(newCache);
-          // newCache.
-          // canvasObjects._drawnShapeObjects[this.shape.id] = this.shape;
         }
         // Same line and user continued drawing this session
         else {
           updateContainerBounds(this.currentLineBounds, bounds);
 
           this.newLineBounds = {
-            ...this.currentLineBounds,
+            x1: this.currentLineBounds.x1,
+            y1: this.currentLineBounds.y2,
+            x2: this.currentLineBounds.x2,
             y2: this.currentLineBounds.y2 + (this.currentLineBounds.y2 - this.currentLineBounds.y1)
           }
         }
@@ -239,16 +288,6 @@ export default function(app) {
         }
       }
 
-      // Update container to ensure it encomposses the new bounds object
-      if(!contains(appState.displayLayerBounds, bounds)) updateContainerBounds(appState.displayLayerBounds, bounds);
-
-      this.drawBoundaryBox = {
-        x1: appState.displayLayerBounds.x1,
-        y1: appState.displayLayerBounds.y1,
-        x2: appState.displayLayerBounds.x2,
-        y2: appState.displayLayerBounds.y2
-      }
-
       this.shape.setBounds(
         this.currentLineBounds.x1,
         this.currentLineBounds.y1,
@@ -256,55 +295,20 @@ export default function(app) {
         this.currentLineBounds.y2 - this.currentLineBounds.y1
       )
 
-      this.currentLineArea.graphics
-          .clear()
-          .setStrokeStyle(1)
-          .beginStroke('#792E10')
-          .drawRect(
-            this.currentLineBounds.x1,
-            this.currentLineBounds.y1,
-            this.currentLineBounds.x2 - this.currentLineBounds.x1,
-            this.currentLineBounds.y2 - this.currentLineBounds.y1
-          )
-          .endStroke()
+      // Update container to ensure it encomposses the new bounds object
+      if(!contains(appState.displayLayerBounds, bounds)) updateContainerBounds(appState.displayLayerBounds, bounds);
 
-      this.newLineArea.graphics
-        .clear()
-        .setStrokeStyle(1)
-        .beginStroke('#340F51')
-        .drawRect(
-          this.newLineBounds.x1,
-          this.newLineBounds.y1,
-          this.newLineBounds.x2 - this.newLineBounds.x1,
-          this.newLineBounds.y2 - this.newLineBounds.y1
-        )
-        .endStroke()
+      debugCurrentLineArea(this.currentLineBounds);
+      debugNewLineArea(this.newLineBounds);
 
-      this.boundary.graphics
-        .clear()
-        .setStrokeStyle(1)
-        .beginStroke('#000000')
-        .drawRect(
-          this.drawBoundaryBox.x1,
-          this.drawBoundaryBox.y1,
-          this.drawBoundaryBox.x2 - this.drawBoundaryBox.x1,
-          this.drawBoundaryBox.y2 - this.drawBoundaryBox.y1
-        )
-        .endStroke()
-        
-      displayObjectText.text =
-        `DisplayLayerBounds: {
-          x:${appState.displayLayerBounds.x1.toFixed(2)},
-          y:${appState.displayLayerBounds.y1.toFixed(2)},
-          width:${appState.displayLayerBounds.width.toFixed(2)},
-          height:${appState.displayLayerBounds.height.toFixed(2)}
-        }`;
-
-      alignDebugToolObjects(all_debug_tools);
+      debugTracker('DisplayLayerBounds', {
+        x1: appState.displayLayerBounds.x1,
+        y1: appState.displayLayerBounds.y1,
+        width: appState.displayLayerBounds.width,
+        height: appState.displayLayerBounds.height
+      });
 
       this.previousBounds = bounds;
-
-      if(this.cacheResult) clearTimeout(this.cacheResult);
 
       this.cacheResult = setTimeout(this.updateCache, 1500);
     }
@@ -317,7 +321,7 @@ export default function(app) {
 
       this.drawSession.forEach(p => {
         graphics.moveTo(p[0],p[1]);
-        for(let i = 2; i < p.length - 1; i +=2 ) {
+        for(let i = 2; i < p.length - 1; i +=2) {
           graphics.lineTo(p[i], p[i + 1]);
         }
       })
@@ -325,7 +329,8 @@ export default function(app) {
 
     updateCache = () => {
       const { x1:x, y1:y, width, height } = appState.displayLayerBounds;
-
+      // const { x, y, width, height } = this.shape.getBounds();
+      console.log('updating cache graphics');
       const updates = new Graphics()
         .setStrokeStyle(this.strokeWidth)
         .beginStroke(this.strokeColor)
@@ -406,13 +411,12 @@ export default function(app) {
           canvasLayer.x += xPos;
           canvasLayer.y += yPos;
 
-          panZoomText.text = `Pan Zoom Text: {
-            x: ${canvasLayer.x.toFixed(2)},
-            y: ${canvasLayer.y.toFixed(2)},
-            zoom: ${this.zoomScale.toFixed(2)}
-          }`;
+          debugTracker('Pan Zoom Text', {
+            x: canvasLayer.x,
+            y: canvasLayer.y,
+            zoom: this.zoomScale
+          });
 
-          alignDebugToolObjects();
         }
         else {
           this.originalX = -1;
@@ -438,13 +442,12 @@ export default function(app) {
       canvasLayer.x += (pointAfterTransform.x - point2BeforeTransform.x) * this.zoomScale;
       canvasLayer.y += (pointAfterTransform.y - point2BeforeTransform.y) * this.zoomScale;
 
-      panZoomText.text = `Pan Zoom Text: {
-        x: ${canvasLayer.x.toFixed(2)},
-        y: ${canvasLayer.y.toFixed(2)},
-        zoom: ${this.zoomScale.toFixed(2)}
-      }`
+      debugTracker('Pan Zoom Text', {
+        x: canvasLayer.x,
+        y: canvasLayer.y,
+        zoom: this.zoomScale
+      });
 
-      alignDebugToolObjects();
     }
 
     centerCanvas = () => {
