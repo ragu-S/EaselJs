@@ -7,6 +7,11 @@ export function contains(containerBounds, childBounds) {
     containerBounds.y2 >= childBounds.y2;
 }
 
+export function boundsHitTest(b1, b2) {
+  return ((b2.x1 < b1.x1) && (b1.x1 < b2.x2) || (b1.x1 < b2.x1) && (b2.x1 < b1.x2)) && // x-axis test
+    ((b2.y1 < b1.y1) && (b1.y1 < b2.y2) || (b1.y1 < b2.y1) && (b2.y1 < b1.y2)) // y-axis test
+}
+
 export function updateContainerBounds(containerBounds, newChildBounds) {
   const { x1, y1, x2, y2 } = newChildBounds;
 
@@ -29,8 +34,8 @@ export function updateContainerBounds(containerBounds, newChildBounds) {
 export function getPathBounds(path, strokeWidth = 0) {
   var x1 = path[0];
   var y1 = path[1];
-  var x2 = 0;
-  var y2 = 0;
+  var x2 = x1;
+  var y2 = y1;
 
   for(let i = 0; i < path.length - 1; i+=2) {
     let x = path[i];
