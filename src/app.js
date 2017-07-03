@@ -1,5 +1,4 @@
 // import * as CREATEJS from 'CREATEJS.js';
-
 const CREATEJS = require('createjs-browserify');
 import state from './state/appState';
 import registerUserEvents from './user-interaction-handelers/registerUserEvents';

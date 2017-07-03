@@ -12,21 +12,24 @@ export function boundsHitTest(b1, b2) {
     ((b2.y1 < b1.y1) && (b1.y1 < b2.y2) || (b1.y1 < b2.y1) && (b2.y1 < b1.y2)) // y-axis test
 }
 
+export function pathsIntersects(path1, path2) {
+  const shortestPath = path1.length < path2.length ? path1 : path2;
+
+  for(var i = shortestPath.length - 2; i >= 0; i-=2) {
+    if((Math.abs(path1[i] - path2[i]) <= 1) &&
+      (Math.abs(path1[i + 1] - path2[i+1]) <= 1)) return true;
+  }
+
+  return false;
+}
+
 export function updateContainerBounds(containerBounds, newChildBounds) {
   const { x1, y1, x2, y2 } = newChildBounds;
 
-  if(containerBounds.x1 > x1) {
-    containerBounds.x1 = x1;
-  }
-  if(containerBounds.y1 > y1) {
-    containerBounds.y1 = y1;
-  }
-  if(containerBounds.x2 < x2) {
-    containerBounds.x2 = x2;
-  }
-  if(containerBounds.y2 < y2) {
-    containerBounds.y2 = y2;
-  }
+  if(containerBounds.x1 > x1) containerBounds.x1 = x1;
+  if(containerBounds.y1 > y1) containerBounds.y1 = y1;
+  if(containerBounds.x2 < x2) containerBounds.x2 = x2;
+  if(containerBounds.y2 < y2) containerBounds.y2 = y2;
 
   return containerBounds;
 }
