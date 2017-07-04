@@ -4,7 +4,8 @@ import {
   autorunAsync
 } from 'mobx';
 
-import { getPathBounds,
+import {
+  getPathBounds,
   centerCoords,
   contains,
   updateContainerBounds,
@@ -303,7 +304,7 @@ export default function(app) {
       if(boundsHitTest(this.previousBounds, bounds) && this.drawSession.length > 1) {
         console.log('character connected!');
         const lastDrawPath = this.drawSession[this.drawSession.length - 2];
-        if(pathsIntersects(lastDrawPath, currentDrawPath)) debugger;
+        if(pathsIntersects(lastDrawPath, currentDrawPath)) console.log('intersection!');
       }
 
       this.shape.setBounds(

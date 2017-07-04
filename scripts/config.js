@@ -13,7 +13,6 @@ if(_.includes('test')) {
   config.entry = path.join('src', 'tests');
 }
 
-
 config.stylesheet = path.parse(config.style).name + '.css';
 
 if (type==='production' && config.timestamp) {

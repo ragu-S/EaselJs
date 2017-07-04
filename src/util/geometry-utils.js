@@ -1,5 +1,3 @@
-
-
 export function contains(containerBounds, childBounds) {
   return containerBounds.x1 <= childBounds.x1 &&
     containerBounds.x2 >= childBounds.x2 &&
@@ -34,7 +32,7 @@ export function updateContainerBounds(containerBounds, newChildBounds) {
   return containerBounds;
 }
 
-export function getPathBounds(path, strokeWidth = 0) {
+export function getPathBounds(path, strokeWidth = 1) {
   var x1 = path[0];
   var y1 = path[1];
   var x2 = x1;

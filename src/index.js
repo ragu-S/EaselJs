@@ -1,7 +1,7 @@
 import App from './app';
 const createjs = require('createjs-browserify');
 import { spy } from 'mobx';
-import { addStageRef } from './util/debug-stats-tool';
+import initUtils from '../util';
 
 window.addEventListener('load', () => {
   const debugQueryParams = location.search.includes('debug') ? location.search.match(/(debug=)([0-9]+)(?=&|$)/i) : 0;
@@ -17,8 +17,8 @@ window.addEventListener('load', () => {
 
   setUpRAFLoop();
 
-  // DEBUG tools
-  addStageRef(App.stage);
+  // initialize utils that need App refs
+  initUtils(App);
 
   setUpTools();
 
@@ -30,9 +30,4 @@ window.addEventListener('load', () => {
       }
     })
   }
-  
-  // var shape = new createjs.Shape();
-  // shape.graphics.beginFill('red').drawRect(0, 0, 120, 120);
-  // App.canvasLayer.addChild(shape);
-  // updateDateCanvasOnce();
 });

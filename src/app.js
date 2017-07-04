@@ -40,7 +40,7 @@ class App {
     // Create a container object called the `stage`
     // this.stage = new CREATEJS.Container();
 
-
+    this.CREATEJS = CREATEJS;
     this.stage = new CREATEJS.Stage('canvas');
     this.stage.addChild(this.canvasLayer);
     CREATEJS.Touch.enable(this.stage);

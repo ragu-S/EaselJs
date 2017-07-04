@@ -5,32 +5,31 @@ const DEBUG_TOOL_MARGIN = {
   bottom: 5,
   right: 10
 };
-const debug_trackers = [];
-let stage = null;
-let widest = 0;
 
 let defaultColors = [
-  '#001f3f', // #001f3f 
-  '#0074D9', // #0074D9 
-  '#7FDBFF', // #7FDBFF 
-  '#39CCCC', // #39CCCC 
-  '#3D9970', // #3D9970 
-  '#2ECC40', // #2ECC40 
-  '#01FF70', // #01FF70 
-  '#FFDC00', // #FFDC00 
-  '#FF851B', // #FF851B 
-  '#FF4136', // #FF4136 
-  '#85144b', // #85144b 
-  '#F012BE', // #F012BE 
-  '#B10DC9', // #B10DC9 
-  '#111111', // #111111 
-  '#AAAAAA', // #AAAAAA 
-  '#DDDDDD', // #DDDDDD 
+  '#001f3f', // #001f3f
+  '#0074D9', // #0074D9
+  '#7FDBFF', // #7FDBFF
+  '#39CCCC', // #39CCCC
+  '#3D9970', // #3D9970
+  '#2ECC40', // #2ECC40
+  '#01FF70', // #01FF70
+  '#FFDC00', // #FFDC00
+  '#FF851B', // #FF851B
+  '#FF4136', // #FF4136
+  '#85144b', // #85144b
+  '#F012BE', // #F012BE
+  '#B10DC9', // #B10DC9
+  '#111111', // #111111
+  '#AAAAAA', // #AAAAAA
+  '#DDDDDD', // #DDDDDD
 ];
 
-export function addStageRef(stageRef) {
-  stage = stageRef;
-}
+const debug_trackers = [];
+let widest = 0;
+
+// App refs for closures
+let stage = null;
 
 export function debugTracker(label, opts, color = null) {
   const tracker = debug_trackers.find(t => t.label === label) || addNewTracker(label, opts, color);
@@ -40,9 +39,13 @@ export function debugTracker(label, opts, color = null) {
   alignDebugToolObjects(debug_trackers);
 }
 
+export default function init(app) {
+  stage = app.stage;
+}
+
 function alignDebugToolObjects() {
   let curYLine = 0;
-  
+
   debug_trackers.forEach(({shape:t}) => {
     let { width, height } = t.getBounds();
     if(width > widest) widest = width;

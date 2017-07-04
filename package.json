@@ -10,14 +10,13 @@
     "dev": "node scripts/dev.js",
     "style": "node scripts/style.js"
   },
-  "author": "",
+  "author": "ragu",
   "license": "ISC",
   "dependencies": {
     "hammerjs": "^2.0.8",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
-    "mobx": "^3.1.11",
-    "pixi.js": "^4.5.2"
+    "mobx": "^3.1.11"
   },
   "devDependencies": {
     "autoprefixer": "^6.2.3",
