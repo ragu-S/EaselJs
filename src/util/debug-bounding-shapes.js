@@ -78,45 +78,5 @@ export function debugBoundsBox(bounds) {
     .endStroke()
 }
 
-export function debugLinearLine(p) {
-  const graphics = shapes.linearLine.graphics;
-  graphics
-    .clear()
-    .setStrokeStyle(1)
-    .beginStroke(LINEAR_LINE_PATH_COLOR)
-    .moveTo(p[0],p[1]);
-    for(let i = 2; i < p.length - 1; i +=2 ) {
-      graphics.lineTo(p[i], p[i + 1]);
-    }
-  graphics.endStroke();
-}
-
-export function debugCurrentLinearLineSession(p) {
-  const graphics = shapes.currentLinearLine.graphics;
-  graphics
-    .clear()
-    .setStrokeStyle(1)
-    .beginStroke(CURRENT_LINEAR_LINE)
-    .moveTo(p[0],p[1]);
-    for(let i = 2; i < p.length - 1; i +=2 ) {
-      graphics.lineTo(p[i], p[i + 1]);
-    }
-  graphics.endStroke();
-}
-
-export function debugLinesSession(bounds) {
-  const graphics = shapes.lines.graphics
-    .clear()
-    .setStrokeStyle(1)
-    .beginStroke(LINES_COLOR)
-    .drawRect(
-      bounds.x1,
-      bounds.y1,
-      bounds.x2 - bounds.x1,
-      bounds.y2 - bounds.y1
-    )
-    .endStroke()
-}
-
 
 

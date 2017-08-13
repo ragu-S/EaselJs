@@ -12,6 +12,30 @@ const POINTER_TYPE = {
   POINTER: 1
 }
 
+const defaultDrawTool = {
+  strokeColor: '#0000ff',
+  fillColor: '#ff00FF',
+  strokeWidth: 1,
+  cachedScale: 1
+};
+
+/* Default state */
+const defaultCanvasObjectsState = {
+  _drawnShapeObjects: {},
+  _shapeObjects: {},
+  numPathsDrawn: 0,
+  avgLineHeight: 0,
+  recentShapeUpdatedId: null,
+  _textData: {
+    style: {
+      strokeColor: defaultDrawTool.strokeColor,
+      fillColor: defaultDrawTool.fillColor,
+      strokeWidth: defaultDrawTool.strokeWidth
+    },
+    path: []
+  }
+};
+
 /* App State */
 class AppState {
   // App Level events
@@ -71,10 +95,10 @@ class PixiPointerState {
 }
 
 class DrawTool {
-  @observable strokeColor = '#0000ff';
-  @observable fillColor = '#ff00FF';
-  @observable strokeWidth = 1;
-  @observable cachedScale = 1;
+  @observable strokeColor = defaultDrawTool.strokeColor;
+  @observable fillColor = defaultDrawTool.fillColor;
+  @observable strokeWidth = defaultDrawTool.strokeWidth;
+  @observable cachedScale = defaultDrawTool.cachedScale;
 }
 
 class QuickTool {
@@ -83,14 +107,37 @@ class QuickTool {
 }
 
 class CanvasObjects {
-  _drawnShapeObjects = {};
-  _shapeObjects = {};
-  @observable numPathsDrawn = 0;
-  @observable avgLineHeight = 0;
-  @observable recentShapeUpdatedId = null;
+  _drawnShapeObjects = {...defaultCanvasObjectsState._drawnShapeObjects};
+  _shapeObjects = {...defaultCanvasObjectsState._shapeObjects};
+  /*
+    [{
+      style: {},
+      path: [
+        [...],
+        [...],
+        [...]
+      ]
+    }]
+   */
+  _textData = [{...defaultCanvasObjectsState._textData}];
+
+  @observable numPathsDrawn = defaultCanvasObjectsState.numPathsDrawn;
+  @observable avgLineHeight = defaultCanvasObjectsState.avgLineHeight;
+  @observable recentShapeUpdatedId = defaultCanvasObjectsState.recentShapeUpdatedId;
 
   @computed get lastDrawnObject() {
     return this._drawnObjects[this._drawnObjects.length - 1];
+  }
+
+  newTextData = () => Object.assign({}, defaultCanvasObjectsState._textData);
+
+  constructor() {
+
+  }
+
+  syncData = () => {
+    // Check if data is available to sync with
+    // if(this._textData.length === 0)
   }
 }
 
