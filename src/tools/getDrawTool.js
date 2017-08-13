@@ -246,6 +246,7 @@ export default function(app) {
             this.cacheResult = null;
           }
 
+          /*****************************************************/
           // Create new Shape container
           const oldShape = this.shape;
           const newShape = new Shape();

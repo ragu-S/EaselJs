@@ -1,7 +1,7 @@
 import App from './app';
 const createjs = require('createjs-browserify');
 import { spy } from 'mobx';
-import initUtils from '../util';
+import initUtils from './util';
 
 window.addEventListener('load', () => {
   const debugQueryParams = location.search.includes('debug') ? location.search.match(/(debug=)([0-9]+)(?=&|$)/i) : 0;

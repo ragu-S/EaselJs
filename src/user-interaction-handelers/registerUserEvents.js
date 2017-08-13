@@ -32,6 +32,8 @@ export default function(app) {
       hammerjs.on('pinchin', this.onPinchInOut);
       hammerjs.on('pinchout', this.onPinchInOut);
 
+      window.addEventListener('touchstart', ev => console.log('touch', ev));
+
       stage.addEventListener('stagemousedown', this.onPointerDown);
       stage.addEventListener('stagemouseup', this.onPointerUp);
       stage.addEventListener('stagemousemove', this.onPointerMove);
@@ -51,10 +53,11 @@ export default function(app) {
 
     @action
     onPointerDown = (ev) => {
-      ev.preventDefault();
+      // ev.preventDefault();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         const touches = nativeEvent.touches;
+        console.log(touches);
         let touchType = (touches[0].radiusX <= 0.2 || touches[0].radiusY <= 0.2) ? POINTER : FINGER;
         pointerState.touchType = touchType;
 
@@ -115,7 +118,7 @@ export default function(app) {
 
     @action
     onPointerUp = (ev) => {
-      ev.preventDefault();
+      // ev.preventDefault();
       const { nativeEvent } = ev;
       if(nativeEvent.touches !== undefined) {
         pointerState.pointerMove = false;
@@ -138,7 +141,7 @@ export default function(app) {
 
     @action
     onPointerMove = (ev) => {
-      ev.preventDefault();
+      // ev.preventDefault();
       const { stageX, stageY, nativeEvent } = ev;
       if(nativeEvent.touches === undefined) return;
       if(pointerState.pointerMove === false) pointerState.pointerMove = true;
